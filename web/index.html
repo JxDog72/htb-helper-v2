@@ -52,6 +52,7 @@
       <button data-tab="files" class="rail-btn">Files</button>
       <button data-tab="report" class="rail-btn">Report</button>
       <button data-tab="status" class="rail-btn">Status</button>
+      <button data-tab="faq" class="rail-btn">FAQ</button>
     </nav>
 
     <main>
@@ -191,12 +192,52 @@
             <ul class="ticks">
               <li><kbd>Ctrl</kbd>+<kbd>S</kbd> save notes</li>
               <li><kbd>Ctrl</kbd>+<kbd>N</kbd> stamp a heading at the cursor</li>
-              <li><kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>8</kbd> switch sections</li>
+              <li><kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>9</kbd> switch sections</li>
               <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> append quick add</li>
               <li>OS launcher: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>H</kbd> after install</li>
             </ul>
           </div>
         </div>
+      </section>
+
+      <section id="tab-faq" class="tab">
+        <article class="faq">
+          <h2>FAQ</h2>
+
+          <h3>How do I start?</h3>
+          <pre class="syntax">cd HTB-Helper_V2.0
+./htb</pre>
+          <p>Parrot/Kali: <code>./htb</code>. Windows: <code>htb.cmd</code>. Browser opens at <code>http://127.0.0.1:8765/</code>. This terminal becomes the logged work shell after lab identity is set.</p>
+          <p>GUI only (no logged shell): <code>./htb --gui-only</code></p>
+
+          <h3>How do I stop?</h3>
+          <ol>
+            <li>In the <strong>logged terminal</strong> type <code>exit</code> (ends <code>session.log</code>).</li>
+            <li>Then <kbd>Ctrl</kbd>+<kbd>C</kbd> in that same terminal to stop the GUI.</li>
+          </ol>
+          <p><kbd>Ctrl</kbd>+<kbd>C</kbd> during a scan (ping, nmap, tracert) should stop <em>that command</em>, not the helper. If the GUI dies too, just start <code>./htb</code> again.</p>
+
+          <h3>Starting again the next day?</h3>
+          <p>Run <code>./htb</code> again. It does <strong>not</strong> overwrite the old log. You get <code>session.log</code>, then <code>session2.log</code>, <code>session3.log</code>, and so on.</p>
+
+          <h3>Where is my work?</h3>
+          <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> — <code>logs/</code>, <code>notes/notes.md</code>, <code>notes/evidence.md</code>, <code>screenshots/</code>. Notes auto-save. Status → ZIP for a backup.</p>
+
+          <h3>Tools IP / port stuck?</h3>
+          <p>Lab identity is only the default. On the Tools form, change <strong>Target IP</strong> and <strong>Port</strong> for that run (another host, a new port, etc.).</p>
+
+          <h3>Nmap files</h3>
+          <p>Each helper nmap run keeps a streamed <code>.txt</code> and nmap’s own <code>.nmap</code>. No xml/gnmap.</p>
+
+          <h3>E-ID and SHA-256</h3>
+          <p><strong>E-001</strong> is just the next evidence number so you can cite it. <strong>SHA-256</strong> is a fingerprint of the source file (optional for the write-up; stored in evidence.md if the file later changes).</p>
+
+          <h3>Report tab</h3>
+          <p>That page is for <em>you</em> to write. It only stubs <code># HTB Challenge:</code> plus Scope / Methodology / Findings / Attack narrative / Remediation / Conclusion. Findings may show a small evidence hint list — rewrite or delete it. Logs and notes are not dumped in.</p>
+
+          <h3>Logs jump to the bottom</h3>
+          <p>Uncheck <strong>Follow</strong>, or scroll up — follow turns off until you scroll to the bottom again.</p>
+        </article>
       </section>
     </main>
   </div>

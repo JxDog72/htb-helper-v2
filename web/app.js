@@ -1,5 +1,5 @@
 (() => {
-  const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "status"];
+  const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "status", "faq"];
   const CATS = ["RECON", "ENUMERATION", "FINDING", "DEAD END", "FOOTHOLD", "PRIVESC", "FLAG", "OTHER"];
 
   const $ = (id) => document.getElementById(id);
@@ -509,7 +509,7 @@
         e.preventDefault();
         $("btn-stamp").click();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key >= "1" && e.key <= "8") {
+      if ((e.ctrlKey || e.metaKey) && e.key >= "1" && e.key <= "9") {
         e.preventDefault();
         setTab(TABS[Number(e.key) - 1]);
       }
