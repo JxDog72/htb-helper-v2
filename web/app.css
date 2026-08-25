@@ -1,28 +1,28 @@
 :root {
-  --chassis: #050806;
-  --panel: #0a140f;
-  --rail: #030705;
-  --rule: #163d28;
-  --paper: #07140c;
-  --paper-edge: #1e5c38;
-  --ink: #c8ffd8;
-  --muted-ink: #6a9a78;
-  --copper: #3dff6a;
-  --copper-hot: #7dff9a;
-  --signal: #3d9eff;
-  --warn: #ff3355;
-  --rec: #ff3355;
-  --quiet: #6a9a78;
-  --console: #020805;
-  --phosphor: #5cff8a;
-  --blue: #3d9eff;
+  --chassis: #000000;
+  --panel: #050a07;
+  --rail: #000000;
+  --rule: #00ff41;
+  --paper: #020805;
+  --paper-edge: #00b4ff;
+  --ink: #b8ffce;
+  --muted-ink: #3d8f55;
+  --copper: #00ff41;
+  --copper-hot: #7cff9c;
+  --signal: #00d4ff;
+  --warn: #ff003c;
+  --rec: #ff003c;
+  --quiet: #3d8f55;
+  --console: #000000;
+  --phosphor: #00ff41;
+  --blue: #00d4ff;
   --font-ui: "Segoe UI", "Ubuntu", "Cantarell", sans-serif;
   --font-mono: "Cascadia Code", "Fira Mono", "Ubuntu Mono", "Consolas", ui-monospace, monospace;
   --font-note: "Cascadia Code", "Fira Mono", "Ubuntu Mono", "Consolas", ui-monospace, monospace;
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--chassis); color: #c8ffd8; font-family: var(--font-ui); }
+html, body { margin: 0; height: 100%; background: #000; color: var(--phosphor); font-family: var(--font-ui); }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 .hidden { display: none !important; }
@@ -34,7 +34,8 @@ button { cursor: pointer; }
   align-items: center;
   padding: 0.7rem 1rem;
   border-bottom: 1px solid var(--rule);
-  background: linear-gradient(180deg, #0a160f, #050806);
+  background: #000;
+  box-shadow: 0 1px 0 #00ff41;
 }
 .brand { display: flex; gap: 0.75rem; align-items: center; }
 .wordmark {
@@ -42,6 +43,8 @@ button { cursor: pointer; }
   letter-spacing: 0.18em;
   text-transform: uppercase;
   font-size: 0.82rem;
+  color: var(--copper);
+  text-shadow: 0 0 8px #00ff4188;
 }
 .edition { color: var(--quiet); font-size: 0.72rem; letter-spacing: 0.08em; }
 .rec {
@@ -199,7 +202,8 @@ label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.82rem;
   width: min(32rem, 92vw); background: var(--panel); border: 1px solid var(--rule);
   padding: 1.4rem; display: flex; flex-direction: column; gap: 0.7rem;
 }
-.setup-card h1 { margin: 0; font-size: 1.5rem; }
+.setup-card h1 { margin: 0; font-size: 1.5rem; color: var(--copper); }
+.setup-card h2 { margin: 1rem 0 0.4rem; font-size: 0.82rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--blue); }
 
 .info-groups { display: flex; flex-direction: column; gap: 1.1rem; }
 .info-group h2 {

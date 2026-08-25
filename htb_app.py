@@ -45,6 +45,7 @@ STATE = {
     "tool_lock": threading.Lock(),
     "notes_lock": threading.Lock(),
     "configured_event": threading.Event(),
+    "session_ready": threading.Event(),
 }
 
 
@@ -92,6 +93,64 @@ def apply_config(config, config_path: Path):
         STATE["configured_event"].set()
     else:
         STATE["workspace"] = None
+
+
+def workspace_root_path():
+    cfg = STATE["config"] or {}
+    root = Path(cfg.get("workspace_root", "./machines")).expanduser()
+    if not root.is_absolute():
+        root = (ROOT / root).resolve()
+    return root
+
+
+def list_labs():
+    root = workspace_root_path()
+    labs = []
+    if not root.is_dir():
+        return labs
+    current = STATE["workspace"].name if STATE["workspace"] else None
+    for folder in sorted(p for p in root.iterdir() if p.is_dir()):
+        meta = load_or_none(folder / "metadata.json") or {}
+        labs.append({
+            "id": folder.name,
+            "student_id": meta.get("student_id") or "",
+            "machine_name": meta.get("machine_name") or folder.name,
+            "target_ip": meta.get("target_ip") or "",
+            "target_port": meta.get("assigned_port"),
+            "research_project": meta.get("research_project") or "",
+            "current": folder.name == current,
+        })
+    return labs
+
+
+def select_lab(folder_name: str):
+    root = workspace_root_path()
+    folder = (root / folder_name).resolve()
+    try:
+        folder.relative_to(root)
+    except ValueError:
+        raise RuntimeError("Lab folder must stay inside the machines directory.")
+    if not folder.is_dir():
+        raise RuntimeError(f"No lab folder named {folder_name}.")
+    meta = load_or_none(folder / "metadata.json") or {}
+    if not meta.get("student_id") or not meta.get("machine_name") or not meta.get("target_ip"):
+        raise RuntimeError("That lab folder is missing metadata.json (student, machine, IP).")
+    prev = STATE["config"] or {}
+    config = {
+        "student_id": meta["student_id"],
+        "machine_name": meta["machine_name"],
+        "target_ip": meta["target_ip"],
+        "target_port": meta.get("assigned_port"),
+        "workspace_root": prev.get("workspace_root", "./machines"),
+        "research_project": meta.get(
+            "research_project",
+            prev.get("research_project", "HTB Enterprise AI Generated Pentest Report Study"),
+        ),
+        "gui_port": prev.get("gui_port", DEFAULT_PORT),
+    }
+    save_config(STATE["config_path"], config)
+    apply_config(config, STATE["config_path"])
+    return config
 
 
 def detect_os():
@@ -775,10 +834,8 @@ class Handler(BaseHTTPRequestHandler):
     server_version = f"HTBHelper/{APP_VERSION}"
 
     def log_message(self, fmt, *args):
-        msg = fmt % args
-        if "/api/state" in msg or "/api/logs?" in msg:
-            return
-        sys.stderr.write("%s - %s\n" % (self.address_string(), msg))
+        # Keep HTTP access lines out of the logged work terminal.
+        return
 
     def _send(self, status, content_type, body: bytes):
         self.send_response(status)
@@ -832,6 +889,14 @@ class Handler(BaseHTTPRequestHandler):
                     "session_log": str(STATE["session_log"]) if STATE["session_log"] else None,
                     "port": STATE["port"],
                     "stats": stats_payload() if STATE["workspace"] else {},
+                    "labs": list_labs(),
+                    "current_lab": STATE["workspace"].name if STATE["workspace"] else None,
+                })
+                return
+            if path == "/api/labs":
+                self._json({
+                    "labs": list_labs(),
+                    "current_lab": STATE["workspace"].name if STATE["workspace"] else None,
                 })
                 return
             if path == "/api/notes":
@@ -930,7 +995,28 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 save_config(STATE["config_path"], config)
                 apply_config(config, STATE["config_path"])
+                STATE["session_ready"].set()
                 self._json({"ok": True, "workspace": str(STATE["workspace"])})
+                return
+
+            if path == "/api/labs/select":
+                folder = str(data.get("id") or "").strip()
+                if not folder:
+                    raise RuntimeError("Pick an existing lab.")
+                select_lab(folder)
+                STATE["session_ready"].set()
+                self._json({
+                    "ok": True,
+                    "workspace": str(STATE["workspace"]),
+                    "config": STATE["config"],
+                })
+                return
+
+            if path == "/api/labs/ready":
+                if not is_configured(STATE["config"]):
+                    raise RuntimeError("Pick or create a lab first.")
+                STATE["session_ready"].set()
+                self._json({"ok": True})
                 return
 
             if path == "/api/notes/append":
@@ -1113,7 +1199,21 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def open_browser(url: str):
+    """Open the GUI without dumping GTK/GPU errors into the logged terminal."""
     try:
+        if os.name == "nt":
+            os.startfile(url)
+            return
+        opener = shutil.which("xdg-open") or shutil.which("gio")
+        if opener:
+            subprocess.Popen(
+                [opener, url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            return
         webbrowser.open(url)
     except Exception:
         pass
@@ -1242,17 +1342,16 @@ def main():
             print("\n[+] Stopped.")
         return
 
-    if not is_configured(STATE["config"]):
-        print("[*] Fill in student ID, machine, and target IP in the browser.")
-        print("[*] After you click Create workspace, this terminal becomes the logged shell.")
-        print("[*] Do not Ctrl+C unless you want to quit the helper.")
-        try:
-            while not STATE["configured_event"].wait(timeout=0.5):
-                pass
-        except KeyboardInterrupt:
-            print("\n[+] Stopped.")
-            return
-        print("[+] Workspace ready. Starting logged shell.\n")
+    print("[*] In the browser: open an existing lab or create a new one.")
+    print("[*] This terminal becomes the logged shell after you choose.")
+    print("[*] Do not Ctrl+C unless you want to quit the helper.")
+    try:
+        while not STATE["session_ready"].wait(timeout=0.5):
+            pass
+    except KeyboardInterrupt:
+        print("\n[+] Stopped.")
+        return
+    print("[+] Workspace ready. Starting logged shell.\n")
 
     log_file = engine.get_next_session_log(STATE["workspace"])
     try:

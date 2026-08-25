@@ -4,23 +4,36 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c45c3e'/></svg>" />
+  <link rel="stylesheet" href="/app.css?v=4" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23000000' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%2300ff41'/></svg>" />
 </head>
 <body>
-  <div id="setup-overlay" class="overlay hidden" role="dialog" aria-labelledby="setup-title">
-    <form id="setup-form" class="setup-card">
-      <p class="kicker">First run</p>
-      <h1 id="setup-title">Lab identity</h1>
-      <p class="lede">These fields name the workspace folder and go into the research metadata. No flags, passwords, or tokens.</p>
-      <label>Student ID<input name="student_id" required autocomplete="off" /></label>
-      <label>Machine name<input name="machine_name" required autocomplete="off" placeholder="Slippy" /></label>
-      <label>Target IP<input name="target_ip" required autocomplete="off" placeholder="10.10.10.10" /></label>
-      <label>Assigned port (optional)<input name="target_port" inputmode="numeric" placeholder="leave blank if none" /></label>
-      <label>Research project<input name="research_project" /></label>
-      <p id="setup-error" class="error" hidden></p>
-      <button type="submit" class="btn copper">Create workspace</button>
-    </form>
+  <div id="setup-overlay" class="overlay" role="dialog" aria-labelledby="setup-title">
+    <div class="setup-card">
+      <p class="kicker">Start</p>
+      <h1 id="setup-title">Choose a machine</h1>
+      <p class="lede">Open a lab you already started, or create a new one. No flags, passwords, or tokens.</p>
+
+      <div id="existing-labs-block" class="hidden">
+        <h2>Existing labs</h2>
+        <label>Machine
+          <select id="lab-select"></select>
+        </label>
+        <button type="button" class="btn copper" id="btn-open-lab">Open selected lab</button>
+      </div>
+
+      <h2>New lab</h2>
+      <form id="setup-form">
+        <label>Student ID<input name="student_id" required autocomplete="off" /></label>
+        <label>Machine name<input name="machine_name" required autocomplete="off" placeholder="Slippy" /></label>
+        <label>Target IP<input name="target_ip" required autocomplete="off" placeholder="10.10.10.10" /></label>
+        <label>Assigned port (optional)<input name="target_port" inputmode="numeric" placeholder="leave blank if none" /></label>
+        <label>Research project<input name="research_project" /></label>
+        <p id="setup-error" class="error" hidden></p>
+        <button type="submit" class="btn copper">Create workspace</button>
+      </form>
+      <button type="button" class="btn ghost hidden" id="btn-dismiss-setup">Stay on current lab</button>
+    </div>
   </div>
 
   <header class="top">
@@ -37,6 +50,7 @@
       <div><dt>Session</dt><dd id="meta-session">idle</dd></div>
     </dl>
     <div class="top-actions">
+      <button type="button" class="btn ghost" id="btn-switch-lab" title="Switch lab">Switch lab</button>
       <button type="button" class="btn ghost" id="btn-help" title="Help">Help</button>
       <button type="button" class="btn ghost" id="btn-save" title="Ctrl+S">Save notes</button>
       <span id="save-state" class="quiet">saved</span>
@@ -233,8 +247,13 @@ python htb_app.py</pre>
 
           <h3>Update to the latest</h3>
           <pre class="syntax">cd HTB-Helper_V2.0
+git stash
 git pull
 # then restart: exit, Ctrl+C, ./htb</pre>
+          <p>If git says local files would be overwritten, run <code>git stash</code> first. Your <code>machines/</code> notes and <code>config.json</code> are not in git.</p>
+
+          <h3>Switch lab / no identity prompt</h3>
+          <p>On start you should see <strong>Choose a machine</strong>: pick an existing lab or create a new one. Later use <strong>Switch lab</strong> in the header. The helper no longer skips that screen just because a previous lab was saved.</p>
 
           <h3>How do I stop?</h3>
           <ol>
@@ -267,6 +286,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js"></script>
+  <script src="/app.js?v=4"></script>
 </body>
 </html>

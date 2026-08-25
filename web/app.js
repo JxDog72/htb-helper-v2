@@ -12,6 +12,7 @@
     currentTool: null,
     follow: true,
     setupSeeded: false,
+    labChosen: false,
   };
 
   function escapeHtml(s) {
@@ -154,10 +155,32 @@
     drawTape(data.text || "");
   }
 
+  function fillLabSelect(labs, current) {
+    const sel = $("lab-select");
+    const block = $("existing-labs-block");
+    if (!labs || !labs.length) {
+      block.classList.add("hidden");
+      sel.innerHTML = "";
+      return;
+    }
+    block.classList.remove("hidden");
+    sel.innerHTML = labs.map((lab) => {
+      const label = `${lab.machine_name || lab.id}  ${lab.target_ip || ""}`.trim();
+      const selected = lab.id === current || lab.current ? " selected" : "";
+      return `<option value="${escapeHtml(lab.id)}"${selected}>${escapeHtml(label)}</option>`;
+    }).join("");
+  }
+
   async function refreshState() {
     const data = await api("/api/state");
-    $("setup-overlay").classList.toggle("hidden", data.configured);
-    if (!data.configured && !state.setupSeeded) {
+    fillLabSelect(data.labs || [], data.current_lab);
+    $("btn-dismiss-setup").classList.toggle("hidden", !data.configured);
+    if (state.labChosen) {
+      $("setup-overlay").classList.add("hidden");
+    } else {
+      $("setup-overlay").classList.remove("hidden");
+    }
+    if (!state.setupSeeded) {
       const c = data.config || {};
       const form = $("setup-form");
       if (c.student_id && c.student_id !== "YOUR_STUDENT_ID") form.student_id.value = c.student_id;
@@ -171,8 +194,15 @@
     $("meta-target").textContent = (data.config && data.config.target_ip) || "—";
     $("meta-session").textContent = data.session_active ? "LIVE" : (data.session_log ? "paused" : "idle");
     $("rec-dot").classList.toggle("live", !!data.session_active);
-    if (data.configured && !$("notes-editor").value && !state.dirty) await loadNotes();
+    if (data.configured && state.labChosen && !$("notes-editor").value && !state.dirty) await loadNotes();
     return data;
+  }
+
+  async function chooseLabDone() {
+    state.labChosen = true;
+    $("setup-overlay").classList.add("hidden");
+    await refreshState();
+    await loadNotes();
   }
 
   async function refreshLogs(reset) {
@@ -438,12 +468,43 @@
             research_project: fd.get("research_project"),
           }),
         });
-        await refreshState();
-        await loadNotes();
+        await chooseLabDone();
       } catch (err) {
         $("setup-error").hidden = false;
         $("setup-error").textContent = err.message;
       }
+    });
+    $("btn-open-lab").addEventListener("click", async () => {
+      $("setup-error").hidden = true;
+      try {
+        await api("/api/labs/select", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: $("lab-select").value }),
+        });
+        await chooseLabDone();
+      } catch (err) {
+        $("setup-error").hidden = false;
+        $("setup-error").textContent = err.message;
+      }
+    });
+    $("btn-dismiss-setup").addEventListener("click", async () => {
+      try {
+        await api("/api/labs/ready", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        await chooseLabDone();
+      } catch (err) {
+        $("setup-error").hidden = false;
+        $("setup-error").textContent = err.message;
+      }
+    });
+    $("btn-switch-lab").addEventListener("click", () => {
+      state.labChosen = false;
+      $("setup-overlay").classList.remove("hidden");
+      refreshState().catch(() => {});
     });
     $("log-select").addEventListener("change", () => {
       state.logName = $("log-select").value;
