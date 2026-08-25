@@ -14,6 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 import argparse
+import base64
 import ipaddress
 import json
 import os
@@ -758,18 +759,73 @@ def evidence_suggestion_lines(workspace):
     return suggestions
 
 
+def report_path():
+    ws = STATE["workspace"]
+    if not ws:
+        return None
+    return ws / "notes" / "report_draft.md"
+
+
+def write_report(text: str):
+    path = report_path()
+    if not path:
+        raise RuntimeError("Workspace is not configured yet.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def save_pasted_image(data_b64: str, mime: str = ""):
+    ws = STATE["workspace"]
+    if not ws:
+        raise RuntimeError("Workspace is not configured yet.")
+    raw = re.sub(r"^data:[^;]+;base64,", "", data_b64)
+    blob = base64.b64decode(raw)
+    ext = "png"
+    mime = (mime or "").lower()
+    if "jpeg" in mime or "jpg" in mime:
+        ext = "jpg"
+    elif "gif" in mime:
+        ext = "gif"
+    elif "webp" in mime:
+        ext = "webp"
+    folder = ws / "notes" / "media"
+    folder.mkdir(parents=True, exist_ok=True)
+    name = f"paste_{engine.timestamp_seconds()}.{ext}"
+    dest = folder / name
+    dest.write_bytes(blob)
+    return engine.relative_path(ws, dest)
+
+
+def workspace_file(rel: str):
+    ws = STATE["workspace"]
+    if not ws:
+        raise RuntimeError("Workspace is not configured yet.")
+    path = (ws / rel).resolve()
+    path.relative_to(ws.resolve())
+    if not path.is_file():
+        raise RuntimeError("File not found.")
+    return path
+
+
 def build_report():
     ws = STATE["workspace"]
     config = STATE["config"] or {}
     if not ws:
         raise RuntimeError("Workspace is not configured yet.")
     machine = config.get("machine_name") or "Unknown"
+    target = config.get("target_ip") or ""
+    port = config.get("target_port") or "None"
     suggestions = evidence_suggestion_lines(ws)
     lines = [
         f"# HTB Challenge: {machine}",
         "",
+        "## Executive Summary",
+        "",
+        "",
         "## Scope",
         "",
+        f"This report covers the authorized HTB machine **{machine}** at `{target}`",
+        f"(assigned port: `{port}`). Testing was limited to that host and the engagement rules.",
         "",
         "## Methodology",
         "",
@@ -936,11 +992,25 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"groups": TOOL_INFO, "target": (STATE["config"] or {}).get("target_ip")})
                 return
             if path == "/api/report":
-                ws = STATE["workspace"]
+                path_r = report_path()
                 text = ""
-                if ws and (ws / "notes" / "report_draft.md").exists():
-                    text = (ws / "notes" / "report_draft.md").read_text(encoding="utf-8", errors="replace")
+                if path_r and path_r.exists():
+                    text = path_r.read_text(encoding="utf-8", errors="replace")
                 self._json({"text": text})
+                return
+            if path == "/api/media":
+                rel = (query.get("path") or [""])[0]
+                dest = workspace_file(rel)
+                suffix = dest.suffix.lower()
+                types = {
+                    ".png": "image/png",
+                    ".jpg": "image/jpeg",
+                    ".jpeg": "image/jpeg",
+                    ".gif": "image/gif",
+                    ".webp": "image/webp",
+                }
+                body = dest.read_bytes()
+                self._send(200, types.get(suffix, "application/octet-stream"), body)
                 return
             if path == "/api/wordlists":
                 self._json({"wordlists": existing_wordlists()})
@@ -957,6 +1027,10 @@ class Handler(BaseHTTPRequestHandler):
             data = self._read_json()
             if parsed.path == "/api/notes":
                 write_notes(data.get("text") or "")
+                self._json({"ok": True})
+                return
+            if parsed.path == "/api/report":
+                write_report(data.get("text") or "")
                 self._json({"ok": True})
                 return
         except Exception as exc:
@@ -1120,6 +1194,14 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/report":
                 text = build_report()
                 self._json({"ok": True, "text": text})
+                return
+
+            if path == "/api/image":
+                rel = save_pasted_image(
+                    data.get("data") or "",
+                    data.get("mime") or "",
+                )
+                self._json({"ok": True, "path": rel})
                 return
 
             if path == "/api/bootstrap":

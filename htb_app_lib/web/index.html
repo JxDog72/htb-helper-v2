@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=4" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23000000' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%2300ff41'/></svg>" />
+  <link rel="stylesheet" href="/app.css?v=5" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c9843a'/></svg>" />
 </head>
 <body>
   <div id="setup-overlay" class="overlay" role="dialog" aria-labelledby="setup-title">
@@ -173,11 +173,16 @@
       </section>
 
       <section id="tab-report" class="tab">
-        <div class="row">
-          <button type="button" class="btn copper" id="btn-report">Write draft to notes/report_draft.md</button>
-          <span class="quiet">Empty template for you to write. Findings may list short evidence hints in small type — rewrite or delete them.</span>
+        <div class="notes-toolbar">
+          <button type="button" class="btn copper" id="btn-report">Insert / reset template</button>
+          <button type="button" class="btn ghost" id="btn-save-report">Save report</button>
+          <span id="report-save-state" class="quiet">saved</span>
+          <span class="quiet">Edit on the left. Preview on the right. Paste images with Ctrl+V. File: notes/report_draft.md</span>
         </div>
-        <article id="report-view" class="paper"></article>
+        <div class="notes-split report-split">
+          <textarea id="report-editor" spellcheck="true" aria-label="report_draft.md" placeholder="# HTB Challenge:&#10;&#10;## Executive Summary&#10;"></textarea>
+          <article id="report-view" class="paper" aria-label="Report preview"></article>
+        </div>
       </section>
 
       <section id="tab-status" class="tab">
@@ -277,10 +282,11 @@ git pull
           <p>Each helper nmap run keeps a streamed <code>.txt</code> and nmap’s own <code>.nmap</code>. No xml/gnmap.</p>
 
           <h3>E-ID and SHA-256</h3>
-          <p><strong>E-001</strong> is just the next evidence number so you can cite it. <strong>SHA-256</strong> is a fingerprint of the source file (optional for the write-up; stored in evidence.md if the file later changes).</p>
+          <p><strong>E-001</strong> is just the next evidence number so you can cite it in the report (like a footnote ID).</p>
+          <p><strong>SHA-256</strong> is a checksum fingerprint of the evidence <em>file</em> (the nmap output, screenshot, etc.). If someone later swaps or edits that file, the hash will not match. You do not need to paste the hash into the written report unless the study asks for it — it is stored in <code>evidence.md</code> automatically.</p>
 
           <h3>Report tab</h3>
-          <p>That page is for <em>you</em> to write. It only stubs <code># HTB Challenge:</code> plus Scope / Methodology / Findings / Attack narrative / Remediation / Conclusion. Findings may show a small evidence hint list — rewrite or delete it. Logs and notes are not dumped in.</p>
+          <p>Write in the left pane; the right pane is a live markdown preview (headings, bullets, images). Auto-saves to <code>notes/report_draft.md</code>. Template: Executive Summary, Scope, Methodology, Findings, Attack narrative, Remediation, Conclusion. Paste screenshots with Ctrl+V. Logs and session notes are not dumped in.</p>
 
           <h3>Logs jump to the bottom</h3>
           <p>Uncheck <strong>Follow</strong>, or scroll up — follow turns off until you scroll to the bottom again.</p>
@@ -288,6 +294,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=4"></script>
+  <script src="/app.js?v=5"></script>
 </body>
 </html>

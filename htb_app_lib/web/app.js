@@ -13,6 +13,7 @@
     follow: true,
     setupSeeded: false,
     labChosen: false,
+    reportDirty: false,
   };
 
   function escapeHtml(s) {
@@ -39,7 +40,15 @@
         list = null;
       }
     };
+    const mediaSrc = (src) => {
+      if (/^(https?:|data:|\/api\/)/i.test(src)) return src;
+      return "/api/media?path=" + encodeURIComponent(src);
+    };
     const inline = (s) => escapeHtml(s)
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) =>
+        `<img alt="${alt}" src="${mediaSrc(src.replace(/&amp;/g, "&"))}">`)
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) =>
+        `<a href="${href}" target="_blank" rel="noopener">${label}</a>`)
       .replace(/`([^`]+)`/g, "<code>$1</code>")
       .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
       .replace(/\*([^*]+)\*/g, "<em>$1</em>");
@@ -118,7 +127,8 @@
     const pos = start + text.length;
     textarea.setSelectionRange(pos, pos);
     textarea.focus();
-    onNotesInput();
+    if (textarea.id === "notes-editor") onNotesInput();
+    if (textarea.id === "report-editor") onReportInput();
   }
 
   function onNotesInput() {
@@ -393,9 +403,58 @@
     loadNotes();
   }
 
+  function onReportInput() {
+    state.reportDirty = true;
+    $("report-save-state").textContent = "unsaved";
+    $("report-view").innerHTML = renderMarkdown($("report-editor").value);
+  }
+
+  async function saveReport() {
+    await api("/api/report", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: $("report-editor").value }),
+    });
+    state.reportDirty = false;
+    $("report-save-state").textContent = "saved";
+  }
+
   async function loadReport() {
     const data = await api("/api/report");
-    $("report-view").innerHTML = renderMarkdown(data.text || "_No draft yet. Click write draft._");
+    $("report-editor").value = data.text || "";
+    state.reportDirty = false;
+    $("report-save-state").textContent = "saved";
+    $("report-view").innerHTML = renderMarkdown(data.text || "_Insert the template, then write here._");
+  }
+
+  function bindImagePaste(textarea) {
+    textarea.addEventListener("paste", async (e) => {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (const item of items) {
+        if (!item.type || !item.type.startsWith("image/")) continue;
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) continue;
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const data = await api("/api/image", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ mime: file.type, data: reader.result }),
+            });
+            insertAtCursor(textarea, `\n![pasted image](${data.path})\n`);
+            if (textarea.id === "report-editor") onReportInput();
+            if (textarea.id === "notes-editor") onNotesInput();
+          } catch (err) {
+            alert(err.message);
+          }
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    });
   }
 
   function wire() {
@@ -545,9 +604,22 @@
       refreshEvidence();
       loadNotes();
     });
+    $("report-editor").addEventListener("input", onReportInput);
+    $("report-editor").addEventListener("keydown", (e) => {
+      if (e.key === "Tab") {
+        e.preventDefault();
+        insertAtCursor($("report-editor"), "    ");
+      }
+    });
+    bindImagePaste($("report-editor"));
+    bindImagePaste($("notes-editor"));
+    $("btn-save-report").addEventListener("click", () => saveReport().catch((err) => alert(err.message)));
     $("btn-report").addEventListener("click", async () => {
       const data = await api("/api/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      $("report-view").innerHTML = renderMarkdown(data.text || "");
+      $("report-editor").value = data.text || "";
+      onReportInput();
+      state.reportDirty = false;
+      $("report-save-state").textContent = "saved";
     });
     $("btn-validate").addEventListener("click", async () => {
       const data = await api("/api/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
@@ -565,7 +637,11 @@
     document.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        saveNotes().catch((err) => alert(err.message));
+        if ($("tab-report").classList.contains("active")) {
+          saveReport().catch((err) => alert(err.message));
+        } else {
+          saveNotes().catch((err) => alert(err.message));
+        }
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
         e.preventDefault();
@@ -578,6 +654,7 @@
     });
     setInterval(() => {
       if (state.dirty) saveNotes().catch(() => {});
+      if (state.reportDirty) saveReport().catch(() => {});
     }, 8000);
     setInterval(() => {
       refreshState().catch(() => {});
