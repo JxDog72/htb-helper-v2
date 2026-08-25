@@ -3,8 +3,8 @@
 ## 1. Copy onto the box
 
 ```bash
-git clone <your-fork-or-this-repo> HTB-Helper_V2.0
-cd HTB-Helper_V2.0
+git clone https://github.com/JxDog72/htb-helper.git
+cd htb-helper
 chmod +x install.sh htb
 ./install.sh
 ```

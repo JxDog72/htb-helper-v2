@@ -1114,18 +1114,27 @@ class Handler(BaseHTTPRequestHandler):
                 phase = str(data.get("phase") or "").strip()
                 description = str(data.get("description") or "").strip()
                 source = str(data.get("source") or "").strip()
-                if not phase or not description or not source:
-                    raise RuntimeError("Phase, description, and source are required.")
-                source_path = (ws / source).resolve()
-                source_path.relative_to(ws.resolve())
-                exists = source_path.exists()
-                status = (
-                    "File found in workspace"
-                    if exists
-                    else "File not found — check the path"
-                )
-                size = source_path.stat().st_size if exists and source_path.is_file() else None
-                digest = engine.sha256_file(source_path) if exists and source_path.is_file() else None
+                source_na = bool(data.get("source_na"))
+                if not phase or not description:
+                    raise RuntimeError("Phase and description are required.")
+                if source_na or source.upper() in ("N/A", "NA"):
+                    source = "N/A"
+                    status = "N/A"
+                    size = None
+                    digest = None
+                else:
+                    if not source:
+                        raise RuntimeError("Source file is required, or check Source N/A.")
+                    source_path = (ws / source).resolve()
+                    source_path.relative_to(ws.resolve())
+                    exists = source_path.exists()
+                    status = (
+                        "File found in workspace"
+                        if exists
+                        else "File not found — check the path"
+                    )
+                    size = source_path.stat().st_size if exists and source_path.is_file() else None
+                    digest = engine.sha256_file(source_path) if exists and source_path.is_file() else None
                 with evidence_file.open("a", encoding="utf-8") as handle:
                     handle.write(f"\n## E-{evidence_id:03d}\n")
                     handle.write(f"- Time: {human_ts()}\n")

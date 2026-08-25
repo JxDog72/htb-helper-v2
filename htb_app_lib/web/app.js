@@ -1,5 +1,5 @@
 (() => {
-  const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "status", "help"];
+  const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "convert", "status", "help"];
   const CATS = ["RECON", "ENUMERATION", "FINDING", "DEAD END", "FOOTHOLD", "PRIVESC", "FLAG", "OTHER"];
 
   const $ = (id) => document.getElementById(id);
@@ -627,6 +627,35 @@
       $("tool-out").textContent = err.message;
     }));
     $("info-search").addEventListener("input", () => renderInfo());
+    $("source-na").addEventListener("change", () => {
+      $("evidence-source").disabled = $("source-na").checked;
+      if ($("source-na").checked) $("evidence-source").value = "";
+    });
+    function parseNums(text, base) {
+      return text.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean).map((t) => parseInt(t, base));
+    }
+    $("btn-conv-from-dec").addEventListener("click", () => {
+      const nums = parseNums($("conv-decimal").value, 10);
+      if (nums.some((n) => Number.isNaN(n))) {
+        $("conv-text").value = "Invalid decimal list";
+        return;
+      }
+      $("conv-text").value = nums.map((n) => String.fromCharCode(n)).join("");
+    });
+    $("btn-conv-from-hex").addEventListener("click", () => {
+      const raw = $("conv-hex").value.replace(/0x/gi, " ").trim();
+      const nums = parseNums(raw, 16);
+      if (nums.some((n) => Number.isNaN(n))) {
+        $("conv-text").value = "Invalid hex";
+        return;
+      }
+      $("conv-text").value = nums.map((n) => String.fromCharCode(n)).join("");
+    });
+    $("btn-conv-to-dec").addEventListener("click", () => {
+      const text = $("conv-text").value;
+      $("conv-decimal").value = [...text].map((c) => c.charCodeAt(0)).join(" ");
+      $("conv-hex").value = [...text].map((c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join(" ");
+    });
     $("evidence-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const fd = new FormData($("evidence-form"));
@@ -637,9 +666,12 @@
           phase: fd.get("phase"),
           description: fd.get("description"),
           source: fd.get("source"),
+          source_na: $("source-na").checked,
         }),
       });
       e.target.reset();
+      $("source-na").checked = false;
+      $("evidence-source").disabled = false;
       refreshEvidence();
       loadNotes();
     });

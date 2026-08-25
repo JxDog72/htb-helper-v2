@@ -297,11 +297,17 @@ TOOL_INFO = [
                     "-A               OS + version + scripts + traceroute",
                     "-oN file.nmap    nmap text output (helper also saves a .txt capture)",
                     "--min-rate 1000  faster timing (noisier)",
+                    "--script vuln    NSE vuln scripts (authorized labs only; noisy)",
+                    "--script vuln,safe",
+                    "-sV -sC          version + default scripts (good first pass)",
+                    "--script http-enum,http-title",
                 ],
                 "examples": [
                     "nmap -sV -oN logs/scan.nmap $TARGET",
                     "nmap -p- -sV -oN logs/full.nmap $TARGET",
                     "nmap -sV -p $PORT -oN logs/port.nmap $TARGET",
+                    "nmap -sV -sC --script vuln -oN logs/vuln.nmap $TARGET",
+                    "nmap -sV --script vuln -p 80,443,8080 $TARGET",
                 ],
             },
             {
@@ -671,6 +677,66 @@ TOOL_INFO = [
                 ],
                 "examples": [
                     "wget -S -O - http://$TARGET/",
+                ],
+            },
+        ],
+    },
+    {
+        "group": "CTF / HTB extras",
+        "tools": [
+            {
+                "name": "CyberChef",
+                "bin": "browser",
+                "blurb": "The encoding/decoding kitchen HTB materials usually point people to: ASCII, hex, Base64, hashes, magic.",
+                "syntax": "https://gchq.github.io/CyberChef/",
+                "options": [
+                    "From Decimal     72 84 66 123 … → HTB{",
+                    "From Hex         48 54 42 7b …",
+                    "From Base64",
+                    "Magic            try to auto-detect the encoding",
+                    "To Decimal / To Hex   for the other direction",
+                ],
+                "examples": [
+                    "Open https://gchq.github.io/CyberChef/",
+                    "Recipe: From Decimal, delimiter Space, then read HTB{…}",
+                ],
+            },
+            {
+                "name": "CrackStation",
+                "bin": "browser",
+                "blurb": "Lookup unsalted hashes (MD5/SHA1/NTLM) against a large wordlist. Not for salted hashes.",
+                "syntax": "https://crackstation.net/",
+                "options": [
+                    "Paste hash       one per line",
+                    "Use locally      hashcat/john on the box for salted hashes",
+                ],
+                "examples": [
+                    "https://crackstation.net/",
+                ],
+            },
+            {
+                "name": "GTFOBins / LOLBAS",
+                "bin": "browser",
+                "blurb": "Unix binaries you can abuse for privesc (GTFOBins) and Windows living-off-the-land (LOLBAS).",
+                "syntax": "https://gtfobins.github.io/   |   https://lolbas-project.github.io/",
+                "options": [
+                    "Search the binary you found (find, python, tar, certutil, …)",
+                ],
+                "examples": [
+                    "https://gtfobins.github.io/gtfobins/python/",
+                ],
+            },
+            {
+                "name": "Reverse shell cheatsheet",
+                "bin": "browser",
+                "blurb": "Generate a listener + reverse shell one-liner. Only against hosts you are authorized to test.",
+                "syntax": "https://www.revshells.com/",
+                "options": [
+                    "Set IP/port to YOUR attacking box",
+                    "Pick bash / python / powershell / nc",
+                ],
+                "examples": [
+                    "https://www.revshells.com/",
                 ],
             },
         ],

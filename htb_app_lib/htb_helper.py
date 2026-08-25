@@ -1640,6 +1640,29 @@ def find_screenshot_command():
     return None
 
 
+def infer_milestones_from_screenshots(workspace):
+    """Treat files like User-flag.png as the user-flag milestone even if not captured via the menu."""
+    folder = workspace / "screenshots"
+    names = []
+    if folder.is_dir():
+        for path in folder.iterdir():
+            if path.is_file():
+                names.append(path.name.lower())
+    blob = " ".join(names)
+    checks = {
+        "user_flag": ("user-flag", "user_flag", "userflag"),
+        "root_admin_flag": ("root-flag", "root_flag", "rootflag", "admin-flag", "admin_flag"),
+        "initial_recon": ("initial-recon", "initial_recon", "recon"),
+        "initial_foothold": ("foothold", "initial-foothold", "initial_foothold"),
+        "privilege_escalation": ("privesc", "priv-esc", "privilege"),
+        "vulnerability_evidence": ("vuln-evidence", "vulnerability"),
+    }
+    found = {}
+    for key, needles in checks.items():
+        found[key] = any(needle in blob for needle in needles)
+    return found
+
+
 def milestone_label(milestone):
     labels = {
         "initial_recon": "Initial recon screenshot",
@@ -1978,6 +2001,10 @@ def research_statistics(workspace):
             print(f"  {tool:<18} {count}")
 
     milestones = manifest.get("milestones", {})
+    inferred = infer_milestones_from_screenshots(workspace)
+    for key, hit in inferred.items():
+        if hit:
+            milestones[key] = True
     if milestones:
         print("\nScreenshot milestones (optional):")
         for milestone, complete in milestones.items():
@@ -2062,11 +2089,18 @@ def validate_submission(workspace):
             warnings.append("The instructions require documenting what was tried and why in real time.")
 
         milestones = manifest.get("milestones", {})
+        inferred = infer_milestones_from_screenshots(workspace)
+        for key, hit in inferred.items():
+            if hit:
+                milestones[key] = True
+                update_milestone(workspace, key)
         print("\nScreenshot milestones (optional — WARN only means none recorded yet):")
+        print("  Filenames like User-flag.png in screenshots/ count as the user-flag milestone.")
         for milestone, complete in milestones.items():
             print(f"  [{'PASS' if complete else 'WARN'}] {milestone_label(milestone)}")
 
-    screenshot_files = list((workspace / "screenshots").glob("*.png"))
+    screenshot_files = list((workspace / "screenshots").glob("*"))
+    screenshot_files = [p for p in screenshot_files if p.is_file() and p.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".gif"}]
     if screenshot_files:
         print(f"[PASS] {len(screenshot_files)} screenshot(s) found")
     else:

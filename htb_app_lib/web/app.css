@@ -253,6 +253,15 @@ label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.82rem;
 .report-split.mode-view { grid-template-columns: 1fr; }
 .report-split.mode-view #report-editor { display: none; }
 .view-modes { display: flex; gap: 0.25rem; }
+.view-modes .chip {
+  border: 1px solid #efe6d4;
+  color: #efe6d4;
+}
+.view-modes .chip.active {
+  border: 1px solid #ffffff;
+  color: var(--copper-hot);
+  background: #241c16;
+}
 .display-pick { max-width: 14rem; }
 
 .help-page { max-width: 46rem; }
