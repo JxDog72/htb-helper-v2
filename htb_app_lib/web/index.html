@@ -171,7 +171,12 @@
         <form id="evidence-form" class="stack narrow">
           <h2>Record evidence</h2>
           <p class="lede">Points at a file already in the workspace (scan output, screenshot, session log). <strong>E-ID</strong> is the next number (E-001, E-002, …) so you can cite it. <strong>Source status</strong> only means “does that file exist on disk?” — it is not a judgment that the finding is correct. <strong>SHA-256</strong> is a fingerprint of the file in case it is changed later; you do not need it in the write-up.</p>
-          <label>Phase / category<input name="phase" required placeholder="Recon" /></label>
+          <label>Phase / category<input name="phase" required placeholder="Recon, Finding, Foothold" list="phase-names" /></label>
+          <datalist id="phase-names">
+            <option value="Recon"></option>
+            <option value="Finding"></option>
+            <option value="Foothold"></option>
+          </datalist>
           <label>Description<textarea name="description" rows="3" required></textarea></label>
           <label>Source file (relative to workspace)
             <input name="source" id="evidence-source" placeholder="logs/nmap_scan_....nmap" list="file-names" />
@@ -211,11 +216,11 @@
         <div class="stack narrow">
           <h2>Flag converter</h2>
           <p class="lede">HTB flags are often <code>HTB{...}</code>. If you only have ASCII codes, H is <code>72</code>, T is <code>84</code>, B is <code>66</code>, <code>{</code> is <code>123</code>. Convert here, or use CyberChef (linked in Tool Info).</p>
-          <label>ASCII decimals (space, comma, or newline)
-            <textarea id="conv-decimal" rows="4" placeholder="72 84 66 123 70 76 65 71 125"></textarea>
+          <label>ASCII decimals (spaces, commas, or a list)
+            <textarea id="conv-decimal" rows="4" placeholder="72 84 66 123   or   72, 84, 66, 123   or   [72, 84, 66, 123]"></textarea>
           </label>
           <label>Hex (optional)
-            <textarea id="conv-hex" rows="2" placeholder="48 54 42 7b …"></textarea>
+            <textarea id="conv-hex" rows="2" placeholder="48 54 42 7b   or   48, 54, 42, 7b   or   [48, 54, 42, 7b]"></textarea>
           </label>
           <label>Text
             <textarea id="conv-text" rows="3" placeholder="HTB{FLAG}"></textarea>
@@ -225,7 +230,7 @@
             <button type="button" class="btn ghost" id="btn-conv-from-hex">Hex → text</button>
             <button type="button" class="btn ghost" id="btn-conv-to-dec">Text → decimals</button>
           </div>
-          <p class="quiet">Example: <code>72 84 66 123</code> → <code>HTB{</code></p>
+          <p class="quiet">Accepts <code>72 84 66 123</code>, <code>72, 84, 66, 123</code>, or <code>[72, 84, 66, 123]</code> → <code>HTB{</code></p>
         </div>
       </section>
 
@@ -350,6 +355,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=8"></script>
+  <script src="/app.js?v=10"></script>
 </body>
 </html>

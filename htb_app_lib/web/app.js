@@ -632,20 +632,24 @@
       if ($("source-na").checked) $("evidence-source").value = "";
     });
     function parseNums(text, base) {
-      return text.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean).map((t) => parseInt(t, base));
+      const cleaned = String(text || "")
+        .replace(/[\[\](){}<>'"]/g, " ")
+        .replace(/0x/gi, " ");
+      const tokens = cleaned.split(/[\s,;|]+/).map((t) => t.trim()).filter(Boolean);
+      const re = base === 16 ? /^-?[0-9a-f]+$/i : /^-?\d+$/;
+      return tokens.map((t) => (re.test(t) ? parseInt(t, base) : NaN));
     }
     $("btn-conv-from-dec").addEventListener("click", () => {
       const nums = parseNums($("conv-decimal").value, 10);
-      if (nums.some((n) => Number.isNaN(n))) {
+      if (!nums.length || nums.some((n) => Number.isNaN(n))) {
         $("conv-text").value = "Invalid decimal list";
         return;
       }
       $("conv-text").value = nums.map((n) => String.fromCharCode(n)).join("");
     });
     $("btn-conv-from-hex").addEventListener("click", () => {
-      const raw = $("conv-hex").value.replace(/0x/gi, " ").trim();
-      const nums = parseNums(raw, 16);
-      if (nums.some((n) => Number.isNaN(n))) {
+      const nums = parseNums($("conv-hex").value, 16);
+      if (!nums.length || nums.some((n) => Number.isNaN(n))) {
         $("conv-text").value = "Invalid hex";
         return;
       }
