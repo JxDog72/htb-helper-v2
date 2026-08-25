@@ -3,8 +3,8 @@
 ## 1. Copy onto the box
 
 ```bash
-git clone https://github.com/JxDog72/htb-helper.git
-cd htb-helper
+git clone https://github.com/JxDog72/htb-helper-v2.git
+cd htb-helper-v2
 chmod +x install.sh htb
 ./install.sh
 ```

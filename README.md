@@ -23,8 +23,8 @@ No pip packages. Python 3.9+ standard library only.
 ## Fresh Parrot (or Kali) VM
 
 ```bash
-git clone https://github.com/JxDog72/htb-helper.git
-cd htb-helper
+git clone https://github.com/JxDog72/htb-helper-v2.git
+cd htb-helper-v2
 chmod +x install.sh htb
 ./install.sh
 ./htb
@@ -52,7 +52,7 @@ Do **not** use `sudo ./htb`. If you see `Permission denied`, run `chmod +x htb` 
 App source lives in `htb_app_lib/`. `README.md` stays in this directory.
 
 Optional hotkey: Parrot keyboard settings → custom shortcut →
-command `~/htb-helper/htb` → `Ctrl+Alt+H`.
+command `~/htb-helper-v2/htb` → `Ctrl+Alt+H`.
 
 ---
 
@@ -88,7 +88,7 @@ Notes auto-save. `Ctrl+S` save, `Ctrl+N` stamp, `Ctrl+1`–`8` tabs,
 ## Windows HTB labs
 
 ```powershell
-cd htb-helper
+cd htb-helper-v2
 .\install.ps1
 .\htb.cmd
 ```
