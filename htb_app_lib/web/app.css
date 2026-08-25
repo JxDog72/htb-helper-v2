@@ -167,6 +167,7 @@ main { overflow: hidden; min-width: 0; }
 .tool-nav button { text-align: left; background: transparent; border: 0; color: var(--quiet); padding: 0.45rem 0.4rem; }
 .tool-nav button.active { color: var(--copper-hot); }
 .tool-form, .stack { display: flex; flex-direction: column; gap: 0.55rem; }
+#tool-cmd { font-family: var(--font-mono); font-size: 0.85rem; min-height: 3.2rem; }
 .narrow { max-width: 40rem; }
 .tool-card {
   display: flex; justify-content: space-between; gap: 0.8rem;

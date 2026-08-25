@@ -14,6 +14,8 @@
     setupSeeded: false,
     labChosen: false,
     reportDirty: false,
+    cmdDirty: false,
+    toolRunning: false,
   };
 
   function escapeHtml(s) {
@@ -359,56 +361,123 @@
       return `<label>${escapeHtml(f.label)}<input data-field="${escapeHtml(f.name)}" value="${escapeHtml(def)}"${list}></label>`;
     }).join("");
     $("tool-out").textContent = "";
+    $("tool-cmd-preview").textContent = "";
+    $("tool-extra").value = "";
+    state.cmdDirty = false;
+    previewCommand();
   }
 
-  async function runTool(ev) {
-    ev.preventDefault();
-    if (!state.currentTool) return;
+  function toolFields() {
     const fields = {};
     $("tool-fields").querySelectorAll("[data-field]").forEach((el) => {
       fields[el.getAttribute("data-field")] = el.value;
     });
     fields.target = $("tool-target").value.trim();
     fields.port = $("tool-port").value.trim();
+    return fields;
+  }
+
+  function setToolRunning(running) {
+    state.toolRunning = running;
+    $("btn-tool-run").disabled = running;
+    $("btn-tool-stop").disabled = !running;
+  }
+
+  let previewTimer = null;
+  function schedulePreview() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => previewCommand().catch(() => {}), 120);
+  }
+
+  async function previewCommand() {
+    if (!state.currentTool || state.cmdDirty) return;
+    try {
+      const data = await api("/api/tools/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: state.currentTool.id,
+          extra: $("tool-extra").value,
+          fields: toolFields(),
+        }),
+      });
+      $("tool-cmd").value = data.command || "";
+      $("tool-cmd-preview").textContent = "";
+    } catch (err) {
+      $("tool-cmd").value = "";
+      $("tool-cmd-preview").textContent = err.message;
+    }
+  }
+
+  async function runTool(ev) {
+    ev.preventDefault();
+    if (!state.currentTool || state.toolRunning) return;
     const payload = {
       id: state.currentTool.id,
       purpose: $("tool-purpose").value,
       extra: $("tool-extra").value,
-      fields,
+      fields: toolFields(),
+      command: $("tool-cmd").value,
+      command_edited: state.cmdDirty,
     };
     $("tool-out").textContent = "";
-    const res = await fetch("/api/tools/run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      $("tool-out").textContent = err.error || "failed";
-      return;
-    }
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const parts = buf.split("\n\n");
-      buf = parts.pop();
-      for (const part of parts) {
-        const line = part.replace(/^data: /, "");
-        if (!line) continue;
-        let msg;
-        try { msg = JSON.parse(line); } catch { continue; }
-        if (msg.type === "command") $("tool-cmd-preview").textContent = msg.command;
-        if (msg.type === "line") $("tool-out").textContent += msg.text;
-        if (msg.type === "done") $("tool-out").textContent += `\n[exit ${msg.exit_code}] ${msg.output_file}\n${msg.summary || ""}`;
-        if (msg.type === "error") $("tool-out").textContent += `\n[-] ${msg.error}`;
-        $("tool-out").scrollTop = $("tool-out").scrollHeight;
+    setToolRunning(true);
+    try {
+      const res = await fetch("/api/tools/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        $("tool-out").textContent = err.error || "failed";
+        return;
       }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop();
+        for (const part of parts) {
+          const line = part.replace(/^data: /, "");
+          if (!line) continue;
+          let msg;
+          try { msg = JSON.parse(line); } catch { continue; }
+          if (msg.type === "command") $("tool-cmd-preview").textContent = msg.command;
+          if (msg.type === "line") $("tool-out").textContent += msg.text;
+          if (msg.type === "done") {
+            $("tool-out").textContent += `\n[exit ${msg.exit_code}] ${msg.output_file}\n${msg.summary || ""}`;
+            setToolRunning(false);
+          }
+          if (msg.type === "error") {
+            $("tool-out").textContent += `\n[-] ${msg.error}`;
+            setToolRunning(false);
+          }
+          $("tool-out").scrollTop = $("tool-out").scrollHeight;
+        }
+      }
+      loadNotes();
+    } finally {
+      setToolRunning(false);
     }
-    loadNotes();
+  }
+
+  async function stopTool() {
+    if (!state.toolRunning) return;
+    try {
+      await api("/api/tools/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      $("tool-out").textContent += "\n[stop requested]\n";
+    } catch (err) {
+      $("tool-out").textContent += `\n[-] ${err.message}\n`;
+    }
   }
 
   function onReportInput() {
@@ -625,7 +694,23 @@
     });
     $("tool-form").addEventListener("submit", (e) => runTool(e).catch((err) => {
       $("tool-out").textContent = err.message;
+      setToolRunning(false);
     }));
+    $("btn-tool-stop").addEventListener("click", () => stopTool().catch((err) => {
+      $("tool-out").textContent += `\n[-] ${err.message}\n`;
+    }));
+    $("btn-tool-rebuild").addEventListener("click", () => {
+      state.cmdDirty = false;
+      previewCommand().catch(() => {});
+    });
+    $("tool-cmd").addEventListener("input", () => {
+      state.cmdDirty = true;
+    });
+    $("tool-form").addEventListener("input", (e) => {
+      if (e.target && e.target.id === "tool-cmd") return;
+      if (e.target && e.target.id === "tool-purpose") return;
+      schedulePreview();
+    });
     $("info-search").addEventListener("input", () => renderInfo());
     $("source-na").addEventListener("change", () => {
       $("evidence-source").disabled = $("source-na").checked;

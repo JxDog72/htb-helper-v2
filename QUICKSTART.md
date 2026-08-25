@@ -65,8 +65,7 @@ a timeline note.
 **Tool Info** is the cheat sheet (syntax + flags). It does not run
 anything.
 
-You can still type nmap/gobuster yourself in the logged terminal. That
-is the source of truth for interactive work.
+You can still type nmap/gobuster yourself in the logged terminal.
 
 ## 6. Finish
 

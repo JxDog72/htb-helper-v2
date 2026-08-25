@@ -1,3 +1,5 @@
+Inspired by: https://github.com/tjoliveros25/htb-research-helper.git
+
 # HTB Helper 4.0
 
 Local field notebook for the HTB Enterprise research study.
@@ -74,9 +76,9 @@ GUI sections:
 
 | Tab | Job |
 |-----|-----|
-| Notes | Full `.md` editor + live preview. Stamp `### [time] [CATEGORY]`. Quick-add supports headings, bullets, fenced code. |
+| Notes | Full `.md` editor + live preview. Opens with lab identity plus a **Lab instructions** heading to paste the HTB brief. Stamp `### [time] [CATEGORY]`. Quick-add supports headings, bullets, fenced code. |
 | Logs | Tail `session.log` and other files in `logs/` |
-| Tools | Numbered **categories** (Network, Web/Fuzzing, DNS/OSINT, SMB/AD, HTTP, Custom) with sub-tools |
+| Tools | Numbered **categories** (Network, Web/Fuzzing, DNS/OSINT, SMB/AD, HTTP, Custom) with sub-tools. Edit the command before run; **Stop tool** kills the current scan. |
 | Tool Info | Cheat sheet: one-line description, syntax, flags, examples |
 | Evidence / Files / Report / Status | Same study workflow as v3, plus ZIP + validate |
 

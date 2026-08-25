@@ -381,20 +381,32 @@ def setup_workspace(config):
         folder.mkdir(parents=True, exist_ok=True)
 
     notes_file = workspace / "notes" / "notes.md"
+    machine = config["machine_name"]
+    lab_block = (
+        f"## Lab instructions — {machine}\n\n"
+        "Paste the HTB lab instructions here (scope, rules, and any details the box gives you).\n"
+    )
+    old_timeline = (
+        "## Research Timeline\n\n"
+        "Automatic entries summarize observed tool output. The raw files in "
+        "`logs/` remain the authoritative evidence. Student-entered purposes "
+        "and manual notes preserve the student's own reasoning.\n"
+    )
     if not notes_file.exists():
         notes_file.write_text(
             "# HTB Enterprise Research Notes\n\n"
             f"Student ID: {config['student_id']}\n"
-            f"Machine: {config['machine_name']}\n"
+            f"Machine: {machine}\n"
             f"Target: {config['target_ip']}\n"
             f"Assigned Port: {config.get('target_port') or 'None'}\n"
             f"Started: {human_timestamp()}\n\n"
-            "## Research Timeline\n\n"
-            "Automatic entries summarize observed tool output. The raw files in "
-            "`logs/` remain the authoritative evidence. Student-entered purposes "
-            "and manual notes preserve the student's own reasoning.\n",
+            + lab_block,
             encoding="utf-8",
         )
+    else:
+        current = notes_file.read_text(encoding="utf-8")
+        if old_timeline in current:
+            notes_file.write_text(current.replace(old_timeline, lab_block, 1), encoding="utf-8")
 
     evidence_file = workspace / "notes" / "evidence.md"
     if not evidence_file.exists():

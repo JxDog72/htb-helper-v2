@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=8" />
+  <link rel="stylesheet" href="/app.css?v=11" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c9843a'/></svg>" />
 </head>
 <body>
@@ -147,10 +147,16 @@
               <p class="quiet">Starts as the lab identity. Change it for a second host, vhost IP, or a new port.</p>
               <div id="tool-fields"></div>
               <label>Extra arguments
-                <input id="tool-extra" placeholder="optional, no pipes or redirects" />
+                <input id="tool-extra" placeholder="optional flags, no pipes or redirects" />
               </label>
-              <div class="row">
-                <button type="submit" class="btn copper">Run and capture</button>
+              <label>Command
+                <textarea id="tool-cmd" rows="2" spellcheck="false" placeholder="Loads from the selected tool. Edit before you run."></textarea>
+              </label>
+              <p class="quiet">This is the command that will run. Change fields or extra args to rebuild it, or edit this line directly.</p>
+              <div class="row wrap">
+                <button type="submit" class="btn copper" id="btn-tool-run">Run and capture</button>
+                <button type="button" class="btn ghost" id="btn-tool-stop" disabled>Stop tool</button>
+                <button type="button" class="btn ghost" id="btn-tool-rebuild">Reset command</button>
                 <span id="tool-cmd-preview" class="mono quiet"></span>
               </div>
             </form>
@@ -328,7 +334,7 @@ git pull
           <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> — <code>logs/</code>, <code>notes/notes.md</code>, <code>notes/evidence.md</code>, <code>screenshots/</code>. Notes auto-save. Status → ZIP for a backup.</p>
 
           <h3>Tools IP / port stuck?</h3>
-          <p>Lab identity is only the default. On the Tools form, change <strong>Target IP</strong> and <strong>Port</strong> for that run (another host, a new port, etc.).</p>
+          <p>Lab identity is only the default. On the Tools form, change <strong>Target IP</strong> and <strong>Port</strong> for that run (another host, a new port, etc.). The <strong>Command</strong> box is the line that actually runs — edit it, or use Extra arguments and Reset command. <strong>Stop tool</strong> kills the current helper-launched scan (nmap, ping, gobuster, …) without closing the GUI.</p>
 
           <h3>Nmap files</h3>
           <p>Each helper nmap run keeps a streamed <code>.txt</code> and nmap’s own <code>.nmap</code>. No xml/gnmap.</p>
@@ -355,6 +361,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=10"></script>
+  <script src="/app.js?v=12"></script>
 </body>
 </html>

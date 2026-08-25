@@ -21,6 +21,7 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -45,6 +46,8 @@ STATE = {
     "session_active": False,
     "port": DEFAULT_PORT,
     "tool_lock": threading.Lock(),
+    "tool_proc": None,
+    "tool_stop": threading.Event(),
     "notes_lock": threading.Lock(),
     "configured_event": threading.Event(),
     "session_ready": threading.Event(),
@@ -599,6 +602,58 @@ def build_command(tool, fields, extra, config):
     raise RuntimeError(f"Unknown tool kind: {kind}")
 
 
+def format_command(command):
+    if os.name == "nt":
+        return subprocess.list2cmdline(command)
+    return shlex.join(command)
+
+
+def parse_command_override(text):
+    command_text = str(text or "").strip()
+    if not command_text:
+        raise RuntimeError("Command is empty.")
+    if engine.shell_meta_present(command_text):
+        raise RuntimeError("Pipes, redirects, and ';' are not allowed. The helper already captures output.")
+    parts = shlex.split(command_text, posix=(os.name != "nt"))
+    if not parts:
+        raise RuntimeError("Command is empty.")
+    return parts
+
+
+def collect_tool_fields(data):
+    _, tool = find_tool(data.get("id") or "")
+    if not tool:
+        raise RuntimeError("Unknown tool.")
+    if not STATE["workspace"] or not is_configured(STATE["config"]):
+        raise RuntimeError("Configure the lab identity first.")
+    fields = fill_defaults(tool, data.get("fields") or {}, STATE["config"])
+    return tool, fields
+
+
+def resolve_run_command(tool, fields, data):
+    if data.get("command_edited"):
+        return parse_command_override(data.get("command") or "")
+    return build_command(tool, fields, data.get("extra") or "", STATE["config"])
+
+
+def stop_running_tool():
+    proc = STATE.get("tool_proc")
+    if proc is None or proc.poll() is not None:
+        return False
+    STATE["tool_stop"].set()
+    try:
+        if os.name != "nt":
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        else:
+            proc.terminate()
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    return True
+
+
 def fill_defaults(tool, fields, config):
     fields = dict(fields or {})
     if not str(fields.get("target") or "").strip():
@@ -639,16 +694,22 @@ def run_tool_streaming(command, output_file, send_line):
     captured_chars = 0
     interrupted = False
     truncated = False
+    code = 1
     output_file.parent.mkdir(parents=True, exist_ok=True)
+    popen_kw = dict(
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        errors="replace",
+        bufsize=1,
+    )
+    if os.name == "nt":
+        popen_kw["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        popen_kw["start_new_session"] = True
     with output_file.open("w", encoding="utf-8", errors="replace") as handle:
-        process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            errors="replace",
-            bufsize=1,
-        )
+        process = subprocess.Popen(command, **popen_kw)
+        STATE["tool_proc"] = process
         try:
             assert process.stdout is not None
             for line in process.stdout:
@@ -666,12 +727,16 @@ def run_tool_streaming(command, output_file, send_line):
             code = process.wait()
         except KeyboardInterrupt:
             interrupted = True
-            process.terminate()
+            stop_running_tool()
             try:
                 code = process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
                 code = process.wait()
+        finally:
+            STATE["tool_proc"] = None
+    if STATE["tool_stop"].is_set():
+        interrupted = True
     return {
         "returncode": code,
         "output": "".join(captured),
@@ -1236,6 +1301,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(try_bootstrap())
                 return
 
+            if path == "/api/tools/preview":
+                tool, fields = collect_tool_fields(data)
+                command = build_command(tool, fields, data.get("extra") or "", STATE["config"])
+                self._json({"command": format_command(command)})
+                return
+
+            if path == "/api/tools/stop":
+                self._json({"ok": True, "stopped": stop_running_tool()})
+                return
+
             if path == "/api/tools/run":
                 self._run_tool_sse(data)
                 return
@@ -1246,24 +1321,18 @@ class Handler(BaseHTTPRequestHandler):
         self._json({"error": "not found"}, 404)
 
     def _run_tool_sse(self, data):
-        if not STATE["workspace"] or not is_configured(STATE["config"]):
-            self._json({"error": "Configure the lab identity first."}, 400)
-            return
-        _, tool = find_tool(data.get("id") or "")
-        if not tool:
-            self._json({"error": "Unknown tool."}, 400)
-            return
+        tool, fields = collect_tool_fields(data)
         purpose = str(data.get("purpose") or "").strip()
         if not purpose:
             self._json({"error": "A short reason/goal is required."}, 400)
             return
-        fields = fill_defaults(tool, data.get("fields") or {}, STATE["config"])
-        command = build_command(tool, fields, data.get("extra") or "", STATE["config"])
+        command = resolve_run_command(tool, fields, data)
         description = tool.get("name") or command[0]
 
         if not STATE["tool_lock"].acquire(blocking=False):
             self._json({"error": "A tool is already running."}, 409)
             return
+        STATE["tool_stop"].clear()
 
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
@@ -1276,7 +1345,7 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.flush()
 
         try:
-            emit({"type": "command", "command": shlex.join(command)})
+            emit({"type": "command", "command": format_command(command)})
             ws = STATE["workspace"]
             identified = engine.identify_tool(command)
             tool_label = identified if identified != "generic" else Path(command[0]).name
@@ -1288,7 +1357,7 @@ class Handler(BaseHTTPRequestHandler):
                 f"Starting {description}.",
                 origin="automatic",
                 tool=tool_label,
-                command=shlex.join(command),
+                command=format_command(command),
                 purpose=purpose,
                 outcome="Command is about to run.",
                 metadata={"event": "attempt_started"},
