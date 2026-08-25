@@ -1406,9 +1406,7 @@ def start_logged_shell(log_file: Path):
         STATE["workspace"],
         "SESSION",
         "Starting a terminal-logged shell for this engagement.",
-        tool="script" if os.name != "nt" else "conpty",
-        purpose="Capture the full terminal interaction, including native scan output.",
-        evidence=[engine.relative_path(STATE["workspace"], log_file)],
+        compact=True,
     )
     print(f"\n[+] Session log: {log_file}")
     print("[+] Work in THIS terminal. Notes / tools GUI is the browser.\n")

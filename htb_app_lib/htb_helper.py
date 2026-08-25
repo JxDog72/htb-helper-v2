@@ -405,8 +405,20 @@ def setup_workspace(config):
         )
     else:
         current = notes_file.read_text(encoding="utf-8")
-        if old_timeline in current:
-            notes_file.write_text(current.replace(old_timeline, lab_block, 1), encoding="utf-8")
+        updated = current
+        if old_timeline in updated:
+            updated = updated.replace(old_timeline, lab_block, 1)
+        compact_session = re.compile(
+            r"(### \[[^\]]+\] \[SESSION\]\n"
+            r"- Summary: Starting a terminal-logged shell for this engagement\.\n)"
+            r"(?:- Origin: [^\n]+\n)?"
+            r"(?:- Tool: [^\n]+\n)?"
+            r"(?:- Why / goal: [^\n]+\n(?:  [^\n]+\n)*)?"
+            r"(?:- Raw evidence:\n(?:  - [^\n]+\n)*)?",
+        )
+        updated = compact_session.sub(r"\1", updated)
+        if updated != current:
+            notes_file.write_text(updated, encoding="utf-8")
 
     evidence_file = workspace / "notes" / "evidence.md"
     if not evidence_file.exists():
@@ -456,6 +468,7 @@ def append_timeline_note(
     evidence=None,
     exit_code=None,
     metadata=None,
+    compact=False,
 ):
     """Append a factual timestamped note and mirror it into the manifest."""
     note_time = human_timestamp()
@@ -468,8 +481,17 @@ def append_timeline_note(
         summary = sanitize_note_text(summary, 700)
         purpose = sanitize_note_text(purpose, 700) if purpose else None
         outcome = sanitize_note_text(outcome, 700) if outcome else None
-    tool = sanitize_note_text(tool, 100) if tool else None
-    command = sanitize_note_text(command, 1500) if command else None
+    tool = None if compact else (sanitize_note_text(tool, 100) if tool else None)
+    command = None if compact else (sanitize_note_text(command, 1500) if command else None)
+    if compact:
+        purpose = None
+        outcome = None
+        origin_write = False
+        evidence = None
+        findings = None
+        exit_code = None
+    else:
+        origin_write = True
 
     clean_findings = []
     for finding in findings or []:
@@ -489,7 +511,8 @@ def append_timeline_note(
     with notes_file.open("a", encoding="utf-8") as handle:
         handle.write(f"\n### [{note_time}] [{category}]\n")
         write_note_field(handle, "Summary", summary)
-        handle.write(f"- Origin: {origin}\n")
+        if origin_write:
+            handle.write(f"- Origin: {origin}\n")
         if tool:
             handle.write(f"- Tool: {tool}\n")
         if purpose:
