@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=6" />
+  <link rel="stylesheet" href="/app.css?v=7" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c9843a'/></svg>" />
 </head>
 <body>
@@ -169,7 +169,7 @@
       <section id="tab-evidence" class="tab">
         <form id="evidence-form" class="stack narrow">
           <h2>Record evidence</h2>
-          <p class="lede">Points at a file already in the workspace (scan output, screenshot, session log). <strong>E-ID</strong> is just the next number (E-001, E-002, …) so you can cite it in the report. <strong>SHA-256</strong> is a fingerprint of that file stored in evidence.md — optional for the write-up, useful if you need to prove the file was not changed later.</p>
+          <p class="lede">Points at a file already in the workspace (scan output, screenshot, session log). <strong>E-ID</strong> is the next number (E-001, E-002, …) so you can cite it. <strong>Source status</strong> only means “does that file exist on disk?” — it is not a judgment that the finding is correct. <strong>SHA-256</strong> is a fingerprint of the file in case it is changed later; you do not need it in the write-up.</p>
           <label>Phase / category<input name="phase" required placeholder="Recon" /></label>
           <label>Description<textarea name="description" rows="3" required></textarea></label>
           <label>Source file (relative to workspace)
@@ -187,12 +187,19 @@
 
       <section id="tab-report" class="tab">
         <div class="notes-toolbar">
+          <label class="display-pick">Display
+            <select id="report-display">
+              <option value="write">1 — Write</option>
+              <option value="view">2 — View</option>
+              <option value="both" selected>3 — Both (split)</option>
+            </select>
+          </label>
           <button type="button" class="btn copper" id="btn-report">Insert / reset template</button>
           <button type="button" class="btn ghost" id="btn-save-report">Save report</button>
           <span id="report-save-state" class="quiet">saved</span>
-          <span class="quiet">Edit on the left. Preview on the right. Paste images with Ctrl+V. File: notes/report_draft.md</span>
+          <span class="quiet">Paste images with Ctrl+V. File: notes/report_draft.md</span>
         </div>
-        <div class="notes-split report-split">
+        <div class="notes-split report-split mode-both" id="report-split">
           <textarea id="report-editor" spellcheck="true" aria-label="report_draft.md" placeholder="# HTB Challenge:&#10;&#10;## Executive Summary&#10;"></textarea>
           <article id="report-view" class="paper" aria-label="Report preview"></article>
         </div>
@@ -299,7 +306,10 @@ git pull
           <p><strong>SHA-256</strong> is a checksum fingerprint of the evidence <em>file</em> (the nmap output, screenshot, etc.). If someone later swaps or edits that file, the hash will not match. You do not need to paste the hash into the written report unless the study asks for it — it is stored in <code>evidence.md</code> automatically.</p>
 
           <h3>Report tab</h3>
-          <p>Write in the left pane; the right pane is a live markdown preview (headings, bullets, images). Auto-saves to <code>notes/report_draft.md</code>. Template: Executive Summary, Scope, Methodology, Findings, Attack narrative, Remediation, Conclusion. Paste screenshots with Ctrl+V. Logs and session notes are not dumped in.</p>
+          <p>Use <strong>Display</strong>: 1 Write (editor only, good on small laptops), 2 View (formatted preview), 3 Both (split). Auto-saves to <code>notes/report_draft.md</code>. Paste images with Ctrl+V.</p>
+
+          <h3>Validation [WARN] user_flag</h3>
+          <p>That is <em>not</em> asking you to type <code>user_flag</code> in notes. It only means you have not recorded a <strong>user-flag screenshot</strong> yet (Status → or Evidence / screenshot). WARN here is a reminder, not a failure. Same for root_admin_flag and other screenshot milestones.</p>
 
           <h3>Pause / resume session logging</h3>
           <p>Header → <strong>Session ▾</strong> → Pause or Resume. The terminal still works while paused; commands are not written to <code>session.log</code> until you resume. Requires <code>./htb</code> (not <code>--gui-only</code>).</p>
@@ -313,6 +323,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=6"></script>
+  <script src="/app.js?v=7"></script>
 </body>
 </html>

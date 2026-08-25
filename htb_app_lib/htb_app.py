@@ -1119,7 +1119,11 @@ class Handler(BaseHTTPRequestHandler):
                 source_path = (ws / source).resolve()
                 source_path.relative_to(ws.resolve())
                 exists = source_path.exists()
-                status = "Verified" if exists else "WARNING: file does not currently exist"
+                status = (
+                    "File found in workspace"
+                    if exists
+                    else "File not found — check the path"
+                )
                 size = source_path.stat().st_size if exists and source_path.is_file() else None
                 digest = engine.sha256_file(source_path) if exists and source_path.is_file() else None
                 with evidence_file.open("a", encoding="utf-8") as handle:

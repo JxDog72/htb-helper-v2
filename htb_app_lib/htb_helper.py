@@ -1590,7 +1590,7 @@ def record_evidence(workspace):
         return
 
     exists = source_path.exists()
-    status = "Verified" if exists else "WARNING: file does not currently exist"
+    status = "File found in workspace" if exists else "File not found — check the path"
     size = source_path.stat().st_size if exists and source_path.is_file() else None
     digest = sha256_file(source_path) if exists and source_path.is_file() else None
     evidence_time = human_timestamp()
@@ -1638,6 +1638,19 @@ def find_screenshot_command():
         if command_exists(command):
             return command
     return None
+
+
+def milestone_label(milestone):
+    labels = {
+        "initial_recon": "Initial recon screenshot",
+        "initial_foothold": "Initial foothold screenshot",
+        "vulnerability_evidence": "Vulnerability-evidence screenshot",
+        "privilege_escalation": "Privilege-escalation screenshot",
+        "user_flag": "User-flag screenshot (only if you took one — do not type this in notes)",
+        "root_admin_flag": "Root/admin-flag screenshot (only if you took one)",
+        "other": "Other screenshot",
+    }
+    return labels.get(milestone, milestone.replace("_", " "))
 
 
 def screenshot_category():
@@ -1966,9 +1979,9 @@ def research_statistics(workspace):
 
     milestones = manifest.get("milestones", {})
     if milestones:
-        print("\nMilestones:")
+        print("\nScreenshot milestones (optional):")
         for milestone, complete in milestones.items():
-            print(f"  [{'PASS' if complete else 'WARN'}] {milestone}")
+            print(f"  [{'PASS' if complete else 'WARN'}] {milestone_label(milestone)}")
 
 
 def validate_submission(workspace):
@@ -2049,9 +2062,9 @@ def validate_submission(workspace):
             warnings.append("The instructions require documenting what was tried and why in real time.")
 
         milestones = manifest.get("milestones", {})
-        print("\nMilestone status:")
+        print("\nScreenshot milestones (optional — WARN only means none recorded yet):")
         for milestone, complete in milestones.items():
-            print(f"  [{'PASS' if complete else 'WARN'}] {milestone}")
+            print(f"  [{'PASS' if complete else 'WARN'}] {milestone_label(milestone)}")
 
     screenshot_files = list((workspace / "screenshots").glob("*.png"))
     if screenshot_files:

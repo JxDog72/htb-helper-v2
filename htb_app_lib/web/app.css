@@ -248,13 +248,19 @@ label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.82rem;
 .notes-split.mode-nice { grid-template-columns: 1fr; }
 .notes-split.mode-nice .tape,
 .notes-split.mode-nice #notes-editor { display: none; }
+.report-split.mode-write { grid-template-columns: 1fr; }
+.report-split.mode-write #report-view { display: none; }
+.report-split.mode-view { grid-template-columns: 1fr; }
+.report-split.mode-view #report-editor { display: none; }
 .view-modes { display: flex; gap: 0.25rem; }
+.display-pick { max-width: 14rem; }
 
 .help-page { max-width: 46rem; }
-.help-page h2 { color: var(--copper); letter-spacing: 0.12em; text-transform: uppercase; }
-.help-page h3 { color: var(--blue); margin: 1.2rem 0 0.35rem; font-size: 1rem; }
-.help-page p, .help-page li { color: var(--ink); line-height: 1.45; }
-.help-page code { color: var(--copper-hot); }
+.help-page h2 { color: var(--copper-hot); letter-spacing: 0.12em; text-transform: uppercase; }
+.help-page h3 { color: var(--copper); margin: 1.2rem 0 0.35rem; font-size: 1rem; }
+.help-page p, .help-page li, .help-page ol { color: #efe6d4; line-height: 1.5; }
+.help-page code { color: var(--copper-hot); background: #241c16; padding: 0.05rem 0.28rem; }
+.help-page kbd { color: #efe6d4; }
 
 @media (max-width: 980px) {
   .shell { grid-template-columns: 1fr; height: auto; }

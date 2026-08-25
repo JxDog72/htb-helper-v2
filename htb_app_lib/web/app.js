@@ -653,6 +653,12 @@
     bindImagePaste($("report-editor"));
     bindImagePaste($("notes-editor"));
     $("btn-save-report").addEventListener("click", () => saveReport().catch((err) => alert(err.message)));
+    $("report-display").addEventListener("change", () => {
+      const mode = $("report-display").value;
+      const wrap = $("report-split");
+      wrap.classList.remove("mode-write", "mode-view", "mode-both");
+      wrap.classList.add("mode-" + mode);
+    });
     $("btn-report").addEventListener("click", async () => {
       const data = await api("/api/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       $("report-editor").value = data.text || "";
