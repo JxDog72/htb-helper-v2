@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # HTB Helper launcher — Parrot / Kali / Debian lab boxes.
+# Run from the clone root (README.md lives here). App code is in htb_app_lib/.
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$DIR"
+chmod +x "$DIR/htb" "$DIR/install.sh" 2>/dev/null || true
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "[*] python3 missing — running install.sh"
   exec bash "$DIR/install.sh" --then-run "$@"
 fi
 
-exec python3 "$DIR/htb_app.py" "$@"
+exec python3 "$DIR/htb_app_lib/htb_app.py" "$@"

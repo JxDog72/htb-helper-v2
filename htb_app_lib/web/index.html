@@ -228,12 +228,14 @@ chmod +x install.sh htb
 
           <h3>Start commands (Linux)</h3>
           <pre class="syntax">cd HTB-Helper_V2.0
-./htb                 # GUI + logged work shell (use this for labs)
-./htb --gui-only      # browser only; this terminal stays a normal shell
-./htb --cli           # original numbered menu (no GUI)
-./htb --check         # environment check, then exit
-python3 htb_app.py    # same as ./htb
-python3 htb_helper.py # original CLI engine</pre>
+chmod +x htb install.sh   # if ./htb says Permission denied — do NOT sudo
+./htb                     # GUI + logged work shell (use this for labs)
+bash ./htb                # same, if execute bit is still off
+./htb --gui-only          # browser only; this terminal stays a normal shell
+./htb --cli               # original numbered menu (no GUI)
+./htb --check             # environment check, then exit
+python3 htb_app_lib/htb_app.py
+python3 htb_app_lib/htb_helper.py</pre>
           <p>GUI: <code>http://127.0.0.1:8765/</code>. After lab identity is set, <code>./htb</code> turns <strong>this</strong> terminal into the logged session.</p>
 
           <h3>Start commands (Windows)</h3>
@@ -243,7 +245,7 @@ python3 htb_helper.py # original CLI engine</pre>
 .\htb.cmd --gui-only
 .\htb.cmd --cli
 .\htb.cmd --check
-python htb_app.py</pre>
+python htb_app_lib\htb_app.py</pre>
 
           <h3>Update to the latest</h3>
           <pre class="syntax">cd HTB-Helper_V2.0

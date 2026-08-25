@@ -1,1 +1,3 @@
 * text=auto eol=lf
+htb text eol=lf
+install.sh text eol=lf

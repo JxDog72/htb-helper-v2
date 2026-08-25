@@ -5,4 +5,4 @@ if errorlevel 1 (
   echo Python not found. Run install.ps1 or install Python 3.9+.
   exit /b 1
 )
-python htb_app.py %*
+python htb_app_lib\htb_app.py %*

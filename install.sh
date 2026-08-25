@@ -58,11 +58,13 @@ else
   echo "[+] Helper packages already present."
 fi
 
-chmod +x "$DIR/htb" "$DIR/htb_app.py" "$DIR/htb_helper.py" 2>/dev/null || true
+chmod +x "$DIR/htb" "$DIR/install.sh" 2>/dev/null || true
 
-if [[ ! -f "$DIR/config.json" && -f "$DIR/config.example.json" ]]; then
-  cp "$DIR/config.example.json" "$DIR/config.json"
-  echo "[*] Wrote config.json from the example. Fill it in on first GUI launch."
+EXAMPLE="$DIR/htb_app_lib/config.example.json"
+CONFIG="$DIR/htb_app_lib/config.json"
+if [[ ! -f "$CONFIG" && -f "$EXAMPLE" ]]; then
+  cp "$EXAMPLE" "$CONFIG"
+  echo "[*] Wrote htb_app_lib/config.json from the example. Fill it in on first GUI launch."
 fi
 
 BIN_DIR="${HOME}/.local/bin"
@@ -96,5 +98,5 @@ echo "Original numbered CLI:"
 echo "  ./htb --cli"
 
 if [[ "$THEN_RUN" -eq 1 ]]; then
-  exec python3 "$DIR/htb_app.py" "$@"
+  exec python3 "$DIR/htb_app_lib/htb_app.py" "$@"
 fi

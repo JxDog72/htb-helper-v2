@@ -22,15 +22,17 @@ if (-not (Have-Cmd nmap)) {
     Write-Host "    If missing: winget install -e --id Insecure.Nmap"
 }
 
-if (-not (Test-Path (Join-Path $Root "config.json")) -and (Test-Path (Join-Path $Root "config.example.json"))) {
-    Copy-Item (Join-Path $Root "config.example.json") (Join-Path $Root "config.json")
+$example = Join-Path $Root "htb_app_lib\config.example.json"
+$config = Join-Path $Root "htb_app_lib\config.json"
+if (-not (Test-Path $config) -and (Test-Path $example)) {
+    Copy-Item $example $config
 }
 
 $launcher = Join-Path $env:USERPROFILE "htb.cmd"
 @"
 @echo off
 cd /d "$Root"
-python htb_app.py %*
+python htb_app_lib\htb_app.py %*
 "@ | Set-Content -Path $launcher -Encoding ASCII
 Write-Host "[+] Launcher: $launcher"
 
@@ -39,7 +41,7 @@ New-Item -ItemType Directory -Force -Path $startDir | Out-Null
 $ws = New-Object -ComObject WScript.Shell
 $lnk = $ws.CreateShortcut((Join-Path $startDir "HTB Helper.lnk"))
 $lnk.TargetPath = "python"
-$lnk.Arguments = "`"$Root\htb_app.py`" --gui-only"
+$lnk.Arguments = "`"$Root\htb_app_lib\htb_app.py`" --gui-only"
 $lnk.WorkingDirectory = $Root
 $lnk.Hotkey = "Ctrl+Alt+H"
 $lnk.WindowStyle = 1

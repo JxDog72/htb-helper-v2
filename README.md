@@ -40,10 +40,16 @@ name, and target IP. After that, `./htb` also wraps **this** terminal in
 a logged shell. Keep it open. Use the browser for notes.
 
 ```bash
-./htb --gui-only    # browser only, no logged shell
-./htb --cli         # original numbered menu
-./htb --check       # environment check
+chmod +x htb install.sh   # needed once if git lost the execute bit
+./htb                     # GUI + logged shell
+./htb --gui-only          # browser only, no logged shell
+./htb --cli               # original numbered menu
+./htb --check             # environment check
 ```
+
+Do **not** use `sudo ./htb`. If you see `Permission denied`, run `chmod +x htb` or `bash ./htb`.
+
+App source lives in `htb_app_lib/`. `README.md` stays in this directory.
 
 Optional hotkey: Parrot keyboard settings → custom shortcut →
 command `~/HTB-Helper_V2.0/htb` → `Ctrl+Alt+H`.
@@ -98,8 +104,8 @@ which drops `ping.exe` / `ipconfig.exe` / `tracert.exe` output).
 `htb_helper.py` is still the capture engine and the old menu:
 
 ```bash
-python3 htb_helper.py
-python3 htb_helper.py --check
+python3 htb_app_lib/htb_helper.py
+python3 htb_app_lib/htb_helper.py --check
 ```
 
 ---

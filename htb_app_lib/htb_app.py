@@ -30,14 +30,15 @@ import htb_helper as engine
 from session_capture import decode_log_bytes, run_logged_shell
 from tools_catalog import COMMON_WORDLISTS, TOOL_GROUPS, TOOL_INFO
 
-ROOT = Path(__file__).resolve().parent
-WEB = ROOT / "web"
+LIB = Path(__file__).resolve().parent
+ROOT = LIB.parent
+WEB = LIB / "web"
 APP_VERSION = "4.0.0"
 DEFAULT_PORT = 8765
 
 STATE = {
     "config": None,
-    "config_path": ROOT / "config.json",
+    "config_path": LIB / "config.json",
     "workspace": None,
     "session_log": None,
     "session_active": False,
@@ -1281,7 +1282,7 @@ def print_banner(url: str):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="HTB Helper local GUI")
-    parser.add_argument("--config", default=str(ROOT / "config.json"))
+    parser.add_argument("--config", default=str(LIB / "config.json"))
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--gui-only", action="store_true", help="Serve the GUI without wrapping a logged shell.")
     parser.add_argument("--cli", action="store_true", help="Original numbered menu (htb_helper.py).")
@@ -1307,8 +1308,8 @@ def main():
             print("[!] Bootstrap: " + result.get("message", "failed"))
 
     config = load_or_none(config_path)
-    if config is None and (ROOT / "config.example.json").exists() and not config_path.exists():
-        shutil.copy(ROOT / "config.example.json", config_path)
+    if config is None and (LIB / "config.example.json").exists() and not config_path.exists():
+        shutil.copy(LIB / "config.example.json", config_path)
         config = load_or_none(config_path)
     apply_config(config, config_path)
 
