@@ -1,0 +1,20 @@
+# Real, per-student configuration (may contain a real target IP / student ID).
+# Copy config.example.json -> config.json locally; do not commit config.json.
+config.json
+
+# Collected research data (session logs, screenshots, notes, evidence).
+machines/
+*.log
+
+# Backup archives created by the helper.
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editor/OS cruft
+.vscode/
+.DS_Store

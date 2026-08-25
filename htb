@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# HTB Helper launcher — Parrot / Kali / Debian lab boxes.
+set -euo pipefail
+DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$DIR"
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "[*] python3 missing — running install.sh"
+  exec bash "$DIR/install.sh" --then-run "$@"
+fi
+
+exec python3 "$DIR/htb_app.py" "$@"

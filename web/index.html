@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HTB Helper</title>
+  <link rel="stylesheet" href="/app.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c45c3e'/></svg>" />
+</head>
+<body>
+  <div id="setup-overlay" class="overlay hidden" role="dialog" aria-labelledby="setup-title">
+    <form id="setup-form" class="setup-card">
+      <p class="kicker">First run</p>
+      <h1 id="setup-title">Lab identity</h1>
+      <p class="lede">These fields name the workspace folder and go into the research metadata. No flags, passwords, or tokens.</p>
+      <label>Student ID<input name="student_id" required autocomplete="off" /></label>
+      <label>Machine name<input name="machine_name" required autocomplete="off" placeholder="Slippy" /></label>
+      <label>Target IP<input name="target_ip" required autocomplete="off" placeholder="10.10.10.10" /></label>
+      <label>Assigned port (optional)<input name="target_port" inputmode="numeric" placeholder="leave blank if none" /></label>
+      <label>Research project<input name="research_project" /></label>
+      <p id="setup-error" class="error" hidden></p>
+      <button type="submit" class="btn copper">Create workspace</button>
+    </form>
+  </div>
+
+  <header class="top">
+    <div class="brand">
+      <span class="rec" id="rec-dot" title="Session logging"></span>
+      <div>
+        <div class="wordmark">HTB Helper</div>
+        <div class="edition">field notebook · v4.0</div>
+      </div>
+    </div>
+    <dl class="meta" id="meta-bar">
+      <div><dt>Machine</dt><dd id="meta-machine">—</dd></div>
+      <div><dt>Target</dt><dd id="meta-target">—</dd></div>
+      <div><dt>Session</dt><dd id="meta-session">idle</dd></div>
+    </dl>
+    <div class="top-actions">
+      <button type="button" class="btn ghost" id="btn-save" title="Ctrl+S">Save notes</button>
+      <span id="save-state" class="quiet">saved</span>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="rail" aria-label="Sections">
+      <button data-tab="notes" class="rail-btn active">Notes</button>
+      <button data-tab="logs" class="rail-btn">Logs</button>
+      <button data-tab="tools" class="rail-btn">Tools</button>
+      <button data-tab="info" class="rail-btn">Tool Info</button>
+      <button data-tab="evidence" class="rail-btn">Evidence</button>
+      <button data-tab="files" class="rail-btn">Files</button>
+      <button data-tab="report" class="rail-btn">Report</button>
+      <button data-tab="status" class="rail-btn">Status</button>
+    </nav>
+
+    <main>
+      <section id="tab-notes" class="tab active">
+        <div class="notes-toolbar">
+          <div class="chips" id="note-cats"></div>
+          <div class="toolbar-right">
+            <button type="button" class="btn ghost" id="btn-stamp" title="Ctrl+N">Stamp entry</button>
+            <button type="button" class="btn ghost" id="btn-heading">##</button>
+            <button type="button" class="btn ghost" id="btn-code">```</button>
+            <button type="button" class="btn ghost" id="btn-list">• list</button>
+          </div>
+        </div>
+        <div class="quick-add">
+          <label class="quiet">Quick add — markdown is allowed (headings, lists, fenced code)</label>
+          <textarea id="quick-body" rows="4" placeholder="## What I tried&#10;&#10;- bullet&#10;&#10;```python&#10;print('this actually works now')&#10;```"></textarea>
+          <div class="row">
+            <button type="button" class="btn copper" id="btn-append">Append to notes.md</button>
+            <span class="quiet">Ctrl+Enter appends · full file below stays one continuous .md</span>
+          </div>
+        </div>
+        <div class="notes-split">
+          <aside class="tape" id="tape" aria-label="Timestamp rail"></aside>
+          <textarea id="notes-editor" spellcheck="false" aria-label="notes.md"></textarea>
+          <article id="notes-preview" class="paper" aria-label="Preview"></article>
+        </div>
+      </section>
+
+      <section id="tab-logs" class="tab">
+        <div class="row wrap">
+          <label>Log file
+            <select id="log-select"></select>
+          </label>
+          <button type="button" class="btn ghost" id="btn-log-refresh">Refresh</button>
+          <label class="check"><input type="checkbox" id="log-follow" checked /> Follow</label>
+        </div>
+        <pre id="log-view" class="console"></pre>
+      </section>
+
+      <section id="tab-tools" class="tab">
+        <div class="tools-layout">
+          <aside class="tool-nav" id="tool-nav"></aside>
+          <div class="tool-panel">
+            <h2 id="tool-group-title">Tools</h2>
+            <p class="lede" id="tool-group-blurb">Pick a category. Each run asks why, captures raw output, and writes a timeline note.</p>
+            <div id="tool-list"></div>
+            <form id="tool-form" class="tool-form hidden">
+              <h3 id="tool-name"></h3>
+              <p class="lede" id="tool-summary"></p>
+              <p id="tool-missing" class="warn hidden">This binary is not on PATH. Install it on the box, or use Custom command.</p>
+              <label>Why / goal (required)
+                <input id="tool-purpose" required placeholder="What are you trying to learn?" />
+              </label>
+              <div id="tool-fields"></div>
+              <label>Extra arguments
+                <input id="tool-extra" placeholder="optional, no pipes or redirects" />
+              </label>
+              <div class="row">
+                <button type="submit" class="btn copper">Run and capture</button>
+                <span id="tool-cmd-preview" class="mono quiet"></span>
+              </div>
+            </form>
+            <pre id="tool-out" class="console"></pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-info" class="tab">
+        <div class="row wrap">
+          <input id="info-search" type="search" placeholder="Filter tools (nmap, ffuf, nxc…)" />
+          <span class="quiet">Cheat sheet only — running a tool is on the Tools tab. Syntax uses the configured target as $TARGET.</span>
+        </div>
+        <div id="info-groups" class="info-groups"></div>
+      </section>
+
+      <section id="tab-evidence" class="tab">
+        <form id="evidence-form" class="stack narrow">
+          <h2>Record evidence</h2>
+          <p class="lede">Points at a file already in the workspace (scan output, screenshot, session log).</p>
+          <label>Phase / category<input name="phase" required placeholder="Recon" /></label>
+          <label>Description<textarea name="description" rows="3" required></textarea></label>
+          <label>Source file (relative to workspace)
+            <input name="source" required placeholder="logs/nmap_scan_....nmap" list="file-names" />
+          </label>
+          <datalist id="file-names"></datalist>
+          <button type="submit" class="btn copper">Record next E-ID</button>
+        </form>
+        <article id="evidence-view" class="paper"></article>
+      </section>
+
+      <section id="tab-files" class="tab">
+        <div id="file-list" class="file-table"></div>
+      </section>
+
+      <section id="tab-report" class="tab">
+        <div class="row">
+          <button type="button" class="btn copper" id="btn-report">Write draft to notes/report_draft.md</button>
+          <span class="quiet">Draft uses # HTB Challenge: then Scope, Methodology, Findings, Attack narrative, Remediation, Conclusion. Edit after.</span>
+        </div>
+        <article id="report-view" class="paper"></article>
+      </section>
+
+      <section id="tab-status" class="tab">
+        <div class="status-grid">
+          <div>
+            <h2>Environment</h2>
+            <ul id="preflight-list" class="ticks"></ul>
+            <button type="button" class="btn ghost" id="btn-bootstrap">Install missing helper packages</button>
+          </div>
+          <div>
+            <h2>Statistics</h2>
+            <dl id="stats-list" class="meta-block"></dl>
+          </div>
+          <div>
+            <h2>Validate</h2>
+            <pre id="validate-out" class="console short"></pre>
+            <button type="button" class="btn ghost" id="btn-validate">Run validation</button>
+          </div>
+          <div>
+            <h2>Backup</h2>
+            <p class="lede">ZIP of the current machine workspace, next to the machines folder.</p>
+            <button type="button" class="btn copper" id="btn-zip">Create ZIP</button>
+            <p id="zip-out" class="quiet"></p>
+          </div>
+          <div>
+            <h2>Hotkeys</h2>
+            <ul class="ticks">
+              <li><kbd>Ctrl</kbd>+<kbd>S</kbd> save notes</li>
+              <li><kbd>Ctrl</kbd>+<kbd>N</kbd> stamp a heading at the cursor</li>
+              <li><kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>8</kbd> switch sections</li>
+              <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> append quick add</li>
+              <li>OS launcher: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>H</kbd> after install</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+    // Your Hack The Box student ID.
+    // Used to build the workspace folder name (e.g. "12345_MachineName")
+    // and is written into notes.md and metadata.json for traceability.
+    "student_id": "YOUR_STUDENT_ID",
+
+    // The exact HTB machine name being assessed.
+    // Also used to build the workspace folder name — keep it consistent
+    // with how the machine is labeled in HTB Enterprise.
+    "machine_name": "MachineName",
+
+    // The target machine's reachable IP address (VPN/lab IP).
+    // Must be a valid IPv4/IPv6 address — validate_config() will reject
+    // anything that isn't parseable by Python's ipaddress module.
+    "target_ip": "10.10.10.10",
+
+    // Optional single port to scan via the "Scan assigned port" menu option.
+    // Set to an integer (1-65535) if your engagement assigns a specific
+    // port; leave as null if there isn't one — the option will just be
+    // unavailable in the menu.
+    "target_port": null,
+
+    // Directory where per-machine workspaces are created
+    // (logs/, screenshots/, notes/, metadata.json).
+    // Relative paths are resolved from wherever the script is run;
+    // the folder is created automatically if it doesn't exist.
+    "workspace_root": "./machines",
+
+    // Free-text label stored in metadata.json under "research_project".
+    // Purely descriptive — has no effect on script behavior.
+    "research_project": "HTB Enterprise AI Generated Pentest Report Study"
+}

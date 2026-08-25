@@ -1,0 +1,9 @@
+{
+    "student_id": "YOUR_STUDENT_ID",
+    "machine_name": "MachineName",
+    "target_ip": "10.10.10.10",
+    "target_port": null,
+    "workspace_root": "./machines",
+    "research_project": "HTB Enterprise AI Generated Pentest Report Study",
+    "gui_port": 8765
+}
