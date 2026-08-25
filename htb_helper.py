@@ -1381,7 +1381,7 @@ def run_nmap(workspace, target, port=None, scan_args=None, description=None):
         command.extend(scan_args)
     if port:
         command.extend(["-p", str(port)])
-    command.extend(["-oA", str(output_prefix), target])
+    command.extend(["-oN", f"{output_prefix}.nmap", target])
 
     text_output = logs / f"{output_prefix.name}.txt"
     record = record_tool_run(
@@ -1396,7 +1396,7 @@ def run_nmap(workspace, target, port=None, scan_args=None, description=None):
         return
 
     generated_files = []
-    for suffix in (".nmap", ".xml", ".gnmap", ".txt"):
+    for suffix in (".nmap", ".txt"):
         path = Path(f"{output_prefix}{suffix}")
         meta = file_metadata(workspace, path)
         if meta:
@@ -1413,7 +1413,7 @@ def run_nmap(workspace, target, port=None, scan_args=None, description=None):
         "files": generated_files,
     })
 
-    print(f"[+] Nmap -oA evidence prefix: {output_prefix}.*")
+    print(f"[+] Nmap text evidence: {output_prefix}.nmap")
 
     # A completed service/version scan with parsed open services is a
     # reasonable point to *offer* an Initial Recon screenshot. This is

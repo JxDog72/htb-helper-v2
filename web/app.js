@@ -54,6 +54,16 @@
         out.push("<hr>");
         continue;
       }
+      if (line.trim() === "<small>") {
+        flushList();
+        out.push('<div class="hint-list">');
+        continue;
+      }
+      if (line.trim() === "</small>") {
+        flushList();
+        out.push("</div>");
+        continue;
+      }
       const h = line.match(/^(#{1,4})\s+(.*)$/);
       if (h) {
         flushList();
@@ -176,14 +186,18 @@
         sel.value = data.files[0];
       }
     }
+    const view = $("log-view");
+    const follow = $("log-follow").checked;
+    const prevTop = view.scrollTop;
     if (reset || data.replace) {
-      $("log-view").textContent = data.text || "";
+      view.textContent = data.text || "";
       state.logOffset = data.offset || 0;
     } else if (data.text) {
-      $("log-view").textContent += data.text;
+      view.textContent += data.text;
       state.logOffset = data.offset;
     }
-    if ($("log-follow").checked) $("log-view").scrollTop = $("log-view").scrollHeight;
+    if (follow) view.scrollTop = view.scrollHeight;
+    else view.scrollTop = prevTop;
   }
 
   async function refreshFiles() {
@@ -282,6 +296,8 @@
     $("tool-name").textContent = found.name;
     $("tool-summary").textContent = found.summary || "";
     $("tool-purpose").value = found.purpose || "";
+    $("tool-target").value = state.tools.target || "";
+    $("tool-port").value = state.tools.port || "";
     $("tool-missing").classList.toggle("hidden", found.installed);
     const fields = $("tool-fields");
     const lists = state.tools.wordlists || [];
@@ -304,6 +320,8 @@
     $("tool-fields").querySelectorAll("[data-field]").forEach((el) => {
       fields[el.getAttribute("data-field")] = el.value;
     });
+    fields.target = $("tool-target").value.trim();
+    fields.port = $("tool-port").value.trim();
     const payload = {
       id: state.currentTool.id,
       purpose: $("tool-purpose").value,
@@ -432,6 +450,11 @@
       refreshLogs(true);
     });
     $("btn-log-refresh").addEventListener("click", () => refreshLogs(true));
+    $("log-view").addEventListener("scroll", () => {
+      const el = $("log-view");
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+      $("log-follow").checked = atBottom;
+    });
     $("tool-nav").addEventListener("click", (e) => {
       const btn = e.target.closest("[data-g]");
       if (btn) showGroup(Number(btn.dataset.g));

@@ -295,13 +295,13 @@ TOOL_INFO = [
                     "-p 22,80,443     specific ports",
                     "-Pn              skip host discovery (treat as up)",
                     "-A               OS + version + scripts + traceroute",
-                    "-oA prefix       save .nmap, .xml, and .gnmap",
+                    "-oN file.nmap    nmap text output (helper also saves a .txt capture)",
                     "--min-rate 1000  faster timing (noisier)",
                 ],
                 "examples": [
-                    "nmap -sV -oA logs/scan $TARGET",
-                    "nmap -p- -sV -oA logs/full $TARGET",
-                    "nmap -sV -p $PORT -oA logs/port $TARGET",
+                    "nmap -sV -oN logs/scan.nmap $TARGET",
+                    "nmap -p- -sV -oN logs/full.nmap $TARGET",
+                    "nmap -sV -p $PORT -oN logs/port.nmap $TARGET",
                 ],
             },
             {

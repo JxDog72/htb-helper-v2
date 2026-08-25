@@ -87,6 +87,7 @@
           </label>
           <button type="button" class="btn ghost" id="btn-log-refresh">Refresh</button>
           <label class="check"><input type="checkbox" id="log-follow" checked /> Follow</label>
+          <span class="quiet">Each ./htb start uses the next free file: session.log, session2.log, …</span>
         </div>
         <pre id="log-view" class="console"></pre>
       </section>
@@ -105,6 +106,15 @@
               <label>Why / goal (required)
                 <input id="tool-purpose" required placeholder="What are you trying to learn?" />
               </label>
+              <div class="row wrap">
+                <label>Target IP
+                  <input id="tool-target" required placeholder="lab IP, or another host you found" />
+                </label>
+                <label>Port (optional)
+                  <input id="tool-port" inputmode="numeric" placeholder="blank = tool default" />
+                </label>
+              </div>
+              <p class="quiet">Starts as the lab identity. Change it for a second host, vhost IP, or a new port.</p>
               <div id="tool-fields"></div>
               <label>Extra arguments
                 <input id="tool-extra" placeholder="optional, no pipes or redirects" />
@@ -130,7 +140,7 @@
       <section id="tab-evidence" class="tab">
         <form id="evidence-form" class="stack narrow">
           <h2>Record evidence</h2>
-          <p class="lede">Points at a file already in the workspace (scan output, screenshot, session log).</p>
+          <p class="lede">Points at a file already in the workspace (scan output, screenshot, session log). <strong>E-ID</strong> is just the next number (E-001, E-002, …) so you can cite it in the report. <strong>SHA-256</strong> is a fingerprint of that file stored in evidence.md — optional for the write-up, useful if you need to prove the file was not changed later.</p>
           <label>Phase / category<input name="phase" required placeholder="Recon" /></label>
           <label>Description<textarea name="description" rows="3" required></textarea></label>
           <label>Source file (relative to workspace)
@@ -149,7 +159,7 @@
       <section id="tab-report" class="tab">
         <div class="row">
           <button type="button" class="btn copper" id="btn-report">Write draft to notes/report_draft.md</button>
-          <span class="quiet">Draft uses # HTB Challenge: then Scope, Methodology, Findings, Attack narrative, Remediation, Conclusion. Edit after.</span>
+          <span class="quiet">Empty template for you to write. Findings may list short evidence hints in small type — rewrite or delete them.</span>
         </div>
         <article id="report-view" class="paper"></article>
       </section>

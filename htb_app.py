@@ -398,15 +398,34 @@ def capture_screenshot(milestone, description):
     return engine.relative_path(ws, dest)
 
 
+def tool_target(fields, config):
+    return str(fields.get("target") or config.get("target_ip") or "").strip()
+
+
+def tool_port(fields, config):
+    raw = fields.get("port")
+    if raw in (None, ""):
+        raw = config.get("target_port")
+    if raw in (None, "", 0, "0"):
+        return None
+    try:
+        port = int(raw)
+    except (TypeError, ValueError):
+        raise RuntimeError("Port must be an integer 1–65535.")
+    if not 1 <= port <= 65535:
+        raise RuntimeError("Port must be between 1 and 65535.")
+    return port
+
+
 def substitute(value: str, fields: dict, config: dict):
-    target = str(config.get("target_ip") or "")
-    port = "" if config.get("target_port") in (None, "", 0) else str(config.get("target_port"))
+    target = tool_target(fields, config)
+    port = tool_port(fields, config)
     mapping = {
         "target": target,
-        "url": fields.get("url") or f"http://{target}",
+        "url": fields.get("url") or (f"http://{target}" if target else ""),
         "wordlist": fields.get("wordlist") or "",
         "query": fields.get("query") or "",
-        "port": port,
+        "port": "" if port is None else str(port),
         "command": fields.get("command") or "",
     }
     mapping.update({k: str(v) for k, v in fields.items() if v is not None})
@@ -445,7 +464,10 @@ def build_command(tool, fields, extra, config):
         extra_parts = shlex.split(extra)
 
     kind = tool["kind"]
-    target = str(config.get("target_ip") or "")
+    target = tool_target(fields, config)
+    port = tool_port(fields, config)
+    if not target and kind != "custom":
+        raise RuntimeError("Target IP is required.")
     if kind == "ping":
         if os.name == "nt":
             return ["ping", "-n", "4", target] + extra_parts
@@ -467,17 +489,20 @@ def build_command(tool, fields, extra, config):
         ws = STATE["workspace"]
         stamp = engine.timestamp_seconds()
         logs = ws / "logs"
-        port = config.get("target_port") if kind == "nmap-port" else None
-        if kind == "nmap-port":
-            if not port:
-                raise RuntimeError("No assigned port in config.")
-            prefix = logs / f"nmap_port_{port}_{stamp}"
-        else:
-            prefix = logs / f"nmap_scan_{stamp}"
-        command = ["nmap"] + list(tool.get("nmap_args") or [])
+        if kind == "nmap-port" and port is None:
+            raise RuntimeError("Set a port for this scan (lab assigned port, or another port you found).")
         if port:
+            nmap_file = logs / f"nmap_port_{port}_{stamp}.nmap"
+        else:
+            nmap_file = logs / f"nmap_scan_{stamp}.nmap"
+        command = ["nmap"] + list(tool.get("nmap_args") or [])
+        # Full-port scans already include -p-; don't also pin a single port
+        # unless the student explicitly set one (then drop -p-).
+        if port:
+            command = [arg for arg in command if arg != "-p-"]
             command.extend(["-p", str(port)])
-        command.extend(["-oA", str(prefix), str(config["target_ip"])])
+        # .txt is the streamed capture; .nmap is nmap's own text format. No xml/gnmap.
+        command.extend(["-oN", str(nmap_file), target])
         return command + extra_parts
 
     if kind == "gobuster":
@@ -515,6 +540,10 @@ def build_command(tool, fields, extra, config):
 
 def fill_defaults(tool, fields, config):
     fields = dict(fields or {})
+    if not str(fields.get("target") or "").strip():
+        fields["target"] = str(config.get("target_ip") or "")
+    if "port" not in fields and config.get("target_port") not in (None, "", 0):
+        fields["port"] = str(config.get("target_port"))
     for spec in tool.get("fields") or []:
         name = spec["name"]
         if not fields.get(name) and spec.get("default"):
@@ -632,98 +661,84 @@ def finish_tool_run(tool, command, purpose, description, result, output_file):
     return run_record
 
 
+def evidence_suggestion_lines(workspace):
+    """Short bullets from evidence.md — no headings, for the student to rewrite."""
+    path = workspace / "notes" / "evidence.md"
+    if not path.exists():
+        return []
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    suggestions = []
+    current_id = None
+    phase = ""
+    description = ""
+    for line in text.splitlines():
+        heading = re.match(r"^## (E-\d+)\s*$", line)
+        if heading:
+            if current_id and description:
+                label = f"{current_id}: {description}"
+                if phase:
+                    label = f"{current_id} ({phase}): {description}"
+                suggestions.append(f"- {label}")
+            current_id = heading.group(1)
+            phase = ""
+            description = ""
+            continue
+        if line.startswith("- Phase:"):
+            phase = line.split(":", 1)[1].strip()
+        elif line.startswith("- Description:"):
+            description = line.split(":", 1)[1].strip()
+    if current_id and description:
+        label = f"{current_id}: {description}"
+        if phase:
+            label = f"{current_id} ({phase}): {description}"
+        suggestions.append(f"- {label}")
+    return suggestions
+
+
 def build_report():
     ws = STATE["workspace"]
     config = STATE["config"] or {}
     if not ws:
         raise RuntimeError("Workspace is not configured yet.")
-    def strip_leading_h1(text: str) -> str:
-        lines = text.splitlines()
-        if lines and lines[0].startswith("# "):
-            lines = lines[1:]
-            while lines and not lines[0].strip():
-                lines = lines[1:]
-        return "\n".join(lines).strip()
-
-    notes = strip_leading_h1(read_notes())
-    evidence = ""
-    ev_path = ws / "notes" / "evidence.md"
-    if ev_path.exists():
-        evidence = strip_leading_h1(
-            ev_path.read_text(encoding="utf-8", errors="replace")
-        )
-    manifest = engine.load_manifest(ws) or {}
-    runs = manifest.get("tool_runs") or []
     machine = config.get("machine_name") or "Unknown"
-    student = config.get("student_id") or ""
-    target = config.get("target_ip") or ""
-    port = config.get("target_port") or "None"
-    project = config.get("research_project") or "HTB Enterprise AI Generated Pentest Report Study"
-
-    method_lines = [
-        "Authorized HTB Enterprise lab only. Work was recorded in real time:",
-        "",
-        "- Terminal session logs under `logs/session*.log` (full command output, including failed attempts)",
-        "- Helper-captured tool runs (raw files under `logs/`)",
-        "- Timestamped notes in `notes/notes.md`",
-        "- Evidence pointers in `notes/evidence.md`",
-        "",
-    ]
-    if runs:
-        method_lines.append("Tools invoked through the helper:")
-        for run in runs:
-            cmd = run.get("command") or run.get("tool_label")
-            method_lines.append(f"- `{cmd}` (exit {run.get('exit_code')})")
-    else:
-        method_lines.append("_No helper-captured tool runs yet. Commands run in the logged terminal still belong in session logs._")
-
-    finding_lines = []
-    for run in runs:
-        for item in run.get("findings") or []:
-            finding_lines.append(f"- {item} _(source: {run.get('tool_label')})_")
-    if evidence:
-        finding_lines.extend(["", "Evidence log:", "", evidence])
-    if not finding_lines:
-        finding_lines.append("_No structured findings yet. Record evidence and keep failed attempts._")
-
+    suggestions = evidence_suggestion_lines(ws)
     lines = [
         f"# HTB Challenge: {machine}",
         "",
-        f"- Student: `{student}`",
-        f"- Target: `{target}`",
-        f"- Assigned port: `{port}`",
-        f"- Study: {project}",
-        f"- Draft generated: {human_ts()}",
-        "",
-        "Draft assembled from the workspace. Edit before any formal submission.",
-        "Do not reconstruct the engagement from memory.",
-        "",
         "## Scope",
         "",
-        f"This report covers the authorized HTB machine **{machine}** at `{target}`",
-        f"(assigned port: `{port}`). Testing was limited to that host and the engagement rules.",
         "",
         "## Methodology",
         "",
-        *method_lines,
         "",
         "## Findings",
         "",
-        *finding_lines,
-        "",
+    ]
+    if suggestions:
+        lines.append("<small>")
+        lines.append("")
+        lines.append("Suggested from the evidence log — rewrite in your words, then delete this list.")
+        lines.append("")
+        lines.extend(suggestions)
+        lines.append("")
+        lines.append("</small>")
+        lines.append("")
+    else:
+        lines.append("")
+    lines.extend([
         "## Attack narrative",
         "",
-        notes or "_No notes yet. Write the story in Notes as you work; it is copied here._",
         "",
         "## Remediation",
         "",
-        "_Summarize recommended fixes for each finding. Do not invent issues that were not observed._",
         "",
         "## Conclusion",
         "",
-        "_State the outcome (foothold, flags, or time expired) and what remains unverified._",
         "",
-    ]
+    ])
     text = "\n".join(lines) + "\n"
     dest = ws / "notes" / "report_draft.md"
     dest.write_text(text, encoding="utf-8")
