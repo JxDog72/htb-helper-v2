@@ -44,6 +44,7 @@ STATE = {
     "port": DEFAULT_PORT,
     "tool_lock": threading.Lock(),
     "notes_lock": threading.Lock(),
+    "configured_event": threading.Event(),
 }
 
 
@@ -88,6 +89,7 @@ def apply_config(config, config_path: Path):
     STATE["config_path"] = config_path
     if is_configured(config):
         STATE["workspace"] = engine.setup_workspace(config)
+        STATE["configured_event"].set()
     else:
         STATE["workspace"] = None
 
@@ -1214,18 +1216,28 @@ def main():
     if not args.no_browser:
         threading.Timer(0.6, open_browser, args=(url,)).start()
 
-    if args.gui_only or not is_configured(STATE["config"]):
-        if not is_configured(STATE["config"]):
-            print("[*] Fill in the lab identity in the browser, then restart without --gui-only")
-            print("    if you want this terminal wrapped in a session log.")
+    if args.gui_only:
         print(f"[*] GUI only. Open {url}")
-        print("[*] Ctrl+C to stop.")
+        print("[*] This terminal stays with the GUI. Ctrl+C to stop.")
+        print("[*] For a logged work shell, run ./htb  (without --gui-only).")
         try:
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
             print("\n[+] Stopped.")
         return
+
+    if not is_configured(STATE["config"]):
+        print("[*] Fill in student ID, machine, and target IP in the browser.")
+        print("[*] After you click Create workspace, this terminal becomes the logged shell.")
+        print("[*] Do not Ctrl+C unless you want to quit the helper.")
+        try:
+            while not STATE["configured_event"].wait(timeout=0.5):
+                pass
+        except KeyboardInterrupt:
+            print("\n[+] Stopped.")
+            return
+        print("[+] Workspace ready. Starting logged shell.\n")
 
     log_file = engine.get_next_session_log(STATE["workspace"])
     try:

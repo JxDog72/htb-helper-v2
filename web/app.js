@@ -11,6 +11,7 @@
     tools: [],
     currentTool: null,
     follow: true,
+    setupSeeded: false,
   };
 
   function escapeHtml(s) {
@@ -146,14 +147,15 @@
   async function refreshState() {
     const data = await api("/api/state");
     $("setup-overlay").classList.toggle("hidden", data.configured);
-    if (!data.configured) {
+    if (!data.configured && !state.setupSeeded) {
       const c = data.config || {};
       const form = $("setup-form");
       if (c.student_id && c.student_id !== "YOUR_STUDENT_ID") form.student_id.value = c.student_id;
       if (c.machine_name && c.machine_name !== "MachineName") form.machine_name.value = c.machine_name;
-      if (c.target_ip) form.target_ip.value = c.target_ip;
+      if (c.target_ip && c.target_ip !== "10.10.10.10") form.target_ip.value = c.target_ip;
       if (c.target_port) form.target_port.value = c.target_port;
       if (c.research_project) form.research_project.value = c.research_project;
+      state.setupSeeded = true;
     }
     $("meta-machine").textContent = (data.config && data.config.machine_name) || "—";
     $("meta-target").textContent = (data.config && data.config.target_ip) || "—";
