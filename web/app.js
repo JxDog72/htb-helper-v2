@@ -1,5 +1,5 @@
 (() => {
-  const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "status", "faq"];
+  const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "status", "help"];
   const CATS = ["RECON", "ENUMERATION", "FINDING", "DEAD END", "FOOTHOLD", "PRIVESC", "FLAG", "OTHER"];
 
   const $ = (id) => document.getElementById(id);
@@ -380,6 +380,7 @@
       }
     });
     $("btn-save").addEventListener("click", () => saveNotes().catch((err) => alert(err.message)));
+    $("btn-help").addEventListener("click", () => setTab("help"));
     CATS.forEach((cat) => {
       const chip = document.createElement("button");
       chip.type = "button";
