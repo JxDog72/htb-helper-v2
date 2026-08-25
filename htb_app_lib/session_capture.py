@@ -18,6 +18,34 @@ import subprocess
 import sys
 import threading
 
+_pause = threading.Event()
+_log_lock = threading.Lock()
+_log_fp = None
+
+
+def session_paused():
+    return _pause.is_set()
+
+
+def set_session_paused(paused: bool) -> str:
+    """Pause or resume writing to the session log. Terminal I/O continues."""
+    global _log_fp
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if paused:
+        _pause.set()
+        msg = f"\n===== LOGGING PAUSED {stamp} =====\n"
+    else:
+        _pause.clear()
+        msg = f"\n===== LOGGING RESUMED {stamp} =====\n"
+    with _log_lock:
+        if _log_fp is not None:
+            try:
+                _log_fp.write(msg)
+                _log_fp.flush()
+            except Exception:
+                pass
+    return msg.strip()
+
 
 def run_logged_shell(log_file: Path) -> int:
     log_file = Path(log_file)
@@ -28,26 +56,63 @@ def run_logged_shell(log_file: Path) -> int:
 
 
 def _run_unix(log_file: Path) -> int:
-    if not shutil.which("script"):
-        print("[-] 'script' not found. Install bsdutils:  sudo apt install bsdutils")
-        return 1
+    """PTY capture so pause/resume can stop writing without killing the shell."""
+    import pty
+
+    global _log_fp
     shell = os.environ.get("SHELL") or "/bin/bash"
-    if sys.platform == "darwin":
-        cmd = ["script", "-q", "-a", "-F", str(log_file), shell]
-    else:
-        cmd = ["script", "-q", "-f", "-a", "-c", shell, str(log_file)]
-    print("[+] Ctrl+C stops the current command (ping/traceroute), not the logger.")
+    _pause.clear()
+    log = log_file.open("a", encoding="utf-8", errors="replace")
+    log.write(
+        f"===== HTB Helper session log (console capture) =====\n"
+        f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"Shell: {shell}\n"
+        f"====================================================\n"
+    )
+    log.flush()
+    _log_fp = log
+    print("[+] Console capture is ON. Pause/Resume is in the Session menu in the GUI.")
+    print("[+] Ctrl+C stops the current command, not the logger.")
     print("[+] Type 'exit' when the session is finished.\n")
+
+    def read(fd):
+        data = os.read(fd, 1024)
+        if data and not _pause.is_set():
+            with _log_lock:
+                try:
+                    log.write(data.decode("utf-8", errors="replace"))
+                    log.flush()
+                except Exception:
+                    pass
+        return data
+
     old = signal.getsignal(signal.SIGINT)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     try:
-        result = subprocess.run(cmd, check=False)
-        return result.returncode or 0
+        pty.spawn(shell, read)
+        return 0
+    except OSError:
+        print("[!] PTY capture failed; falling back to `script` (pause will not hide output).")
+        if shutil.which("script"):
+            if sys.platform == "darwin":
+                cmd = ["script", "-q", "-a", "-F", str(log_file), shell]
+            else:
+                cmd = ["script", "-q", "-f", "-a", "-c", shell, str(log_file)]
+            result = subprocess.run(cmd, check=False)
+            return result.returncode or 0
+        return 1
     finally:
         try:
             signal.signal(signal.SIGINT, old)
         except Exception:
             pass
+        with _log_lock:
+            try:
+                log.write(f"\n===== session ended {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} =====\n")
+                log.close()
+            except Exception:
+                pass
+            _log_fp = None
 
 
 def _run_windows_piped(log_file: Path) -> int:
@@ -66,10 +131,13 @@ def _run_windows_piped(log_file: Path) -> int:
         f"====================================================\n"
     )
 
+    global _log_fp
+    _pause.clear()
     log = log_file.open("a", encoding="utf-8", errors="replace")
     log.write(header)
     log.flush()
-    log_lock = threading.Lock()
+    _log_fp = log
+    log_lock = _log_lock
 
     proc = subprocess.Popen(
         [comspec, "/D", "/K", "prompt $P$G"],
@@ -83,6 +151,8 @@ def _run_windows_piped(log_file: Path) -> int:
     stop = threading.Event()
 
     def write_log(text: str):
+        if _pause.is_set():
+            return
         with log_lock:
             log.write(text)
             log.flush()
@@ -158,8 +228,10 @@ def _run_windows_piped(log_file: Path) -> int:
             pass
         t_out.join(timeout=2)
         kernel32.SetConsoleCtrlHandler(ctrl_handler, False)
-        log.write(f"\n===== session ended {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} =====\n")
-        log.close()
+        with _log_lock:
+            log.write(f"\n===== session ended {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} =====\n")
+            log.close()
+            _log_fp = None
 
     return proc.returncode or 0
 

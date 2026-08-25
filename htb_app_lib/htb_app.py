@@ -28,7 +28,7 @@ import time
 import webbrowser
 
 import htb_helper as engine
-from session_capture import decode_log_bytes, run_logged_shell
+from session_capture import decode_log_bytes, run_logged_shell, session_paused, set_session_paused
 from tools_catalog import COMMON_WORDLISTS, TOOL_GROUPS, TOOL_INFO
 
 LIB = Path(__file__).resolve().parent
@@ -943,6 +943,7 @@ class Handler(BaseHTTPRequestHandler):
                     } if config else {},
                     "workspace": str(STATE["workspace"]) if STATE["workspace"] else None,
                     "session_active": STATE["session_active"],
+                    "session_paused": session_paused(),
                     "session_log": str(STATE["session_log"]) if STATE["session_log"] else None,
                     "port": STATE["port"],
                     "stats": stats_payload() if STATE["workspace"] else {},
@@ -1194,6 +1195,20 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/report":
                 text = build_report()
                 self._json({"ok": True, "text": text})
+                return
+
+            if path == "/api/session":
+                action = str(data.get("action") or "").strip().lower()
+                if action not in ("pause", "resume"):
+                    raise RuntimeError("action must be pause or resume.")
+                if not STATE["session_active"]:
+                    raise RuntimeError("No live session. Start with ./htb (not --gui-only).")
+                set_session_paused(action == "pause")
+                self._json({
+                    "ok": True,
+                    "paused": session_paused(),
+                    "session_active": STATE["session_active"],
+                })
                 return
 
             if path == "/api/image":

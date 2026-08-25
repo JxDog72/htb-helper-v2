@@ -202,8 +202,16 @@
     }
     $("meta-machine").textContent = (data.config && data.config.machine_name) || "—";
     $("meta-target").textContent = (data.config && data.config.target_ip) || "—";
-    $("meta-session").textContent = data.session_active ? "LIVE" : (data.session_log ? "paused" : "idle");
-    $("rec-dot").classList.toggle("live", !!data.session_active);
+    let sessionLabel = "idle";
+    if (data.session_active && data.session_paused) sessionLabel = "PAUSED";
+    else if (data.session_active) sessionLabel = "LIVE";
+    else if (data.session_log) sessionLabel = "ended";
+    $("meta-session").textContent = sessionLabel;
+    $("btn-session-menu").textContent = "Session " + sessionLabel + " ▾";
+    $("session-menu-hint").textContent = data.session_active
+      ? (data.session_paused ? "Logging is paused. Terminal still works." : "Logging every command in this terminal.")
+      : "No live session. Start with ./htb (not --gui-only).";
+    $("rec-dot").classList.toggle("live", !!data.session_active && !data.session_paused);
     if (data.configured && state.labChosen && !$("notes-editor").value && !state.dirty) await loadNotes();
     return data;
   }
@@ -470,6 +478,37 @@
     });
     $("btn-save").addEventListener("click", () => saveNotes().catch((err) => alert(err.message)));
     $("btn-help").addEventListener("click", () => setTab("help"));
+    $("btn-session-menu").addEventListener("click", (e) => {
+      e.stopPropagation();
+      $("session-pop").classList.toggle("hidden");
+    });
+    document.addEventListener("click", () => $("session-pop").classList.add("hidden"));
+    $("session-pop").addEventListener("click", (e) => e.stopPropagation());
+    async function setSession(action) {
+      try {
+        await api("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action }),
+        });
+        $("session-pop").classList.add("hidden");
+        await refreshState();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+    $("btn-session-pause").addEventListener("click", () => setSession("pause"));
+    $("btn-session-resume").addEventListener("click", () => setSession("resume"));
+    document.querySelectorAll("[data-notes-view]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const mode = btn.getAttribute("data-notes-view");
+        $("notes-split").classList.remove("mode-split", "mode-write", "mode-nice");
+        $("notes-split").classList.add("mode-" + mode);
+        document.querySelectorAll("[data-notes-view]").forEach((b) => {
+          b.classList.toggle("active", b === btn);
+        });
+      });
+    });
     CATS.forEach((cat) => {
       const chip = document.createElement("button");
       chip.type = "button";

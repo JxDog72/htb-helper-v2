@@ -231,6 +231,25 @@ label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.82rem;
 }
 #info-search { max-width: 24rem; }
 
+.menu { position: relative; }
+.menu-pop {
+  position: absolute; right: 0; top: calc(100% + 0.25rem);
+  min-width: 14rem; background: var(--panel); border: 1px solid var(--rule);
+  padding: 0.35rem; z-index: 15; display: flex; flex-direction: column; gap: 0.2rem;
+}
+.menu-pop button {
+  background: transparent; border: 0; color: #efe6d4; text-align: left;
+  padding: 0.4rem 0.5rem;
+}
+.menu-pop button:hover { background: #241c16; color: var(--copper-hot); }
+.notes-split.mode-write { grid-template-columns: 1fr; }
+.notes-split.mode-write .tape,
+.notes-split.mode-write #notes-preview { display: none; }
+.notes-split.mode-nice { grid-template-columns: 1fr; }
+.notes-split.mode-nice .tape,
+.notes-split.mode-nice #notes-editor { display: none; }
+.view-modes { display: flex; gap: 0.25rem; }
+
 .help-page { max-width: 46rem; }
 .help-page h2 { color: var(--copper); letter-spacing: 0.12em; text-transform: uppercase; }
 .help-page h3 { color: var(--blue); margin: 1.2rem 0 0.35rem; font-size: 1rem; }

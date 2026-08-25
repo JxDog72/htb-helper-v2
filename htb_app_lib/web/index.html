@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=5" />
+  <link rel="stylesheet" href="/app.css?v=6" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c9843a'/></svg>" />
 </head>
 <body>
@@ -50,6 +50,14 @@
       <div><dt>Session</dt><dd id="meta-session">idle</dd></div>
     </dl>
     <div class="top-actions">
+      <div class="menu" id="session-menu">
+        <button type="button" class="btn ghost" id="btn-session-menu" aria-haspopup="true">Session ▾</button>
+        <div class="menu-pop hidden" id="session-pop" role="menu">
+          <button type="button" id="btn-session-pause">Pause logging</button>
+          <button type="button" id="btn-session-resume">Resume logging</button>
+          <p class="quiet" id="session-menu-hint">No live session</p>
+        </div>
+      </div>
       <button type="button" class="btn ghost" id="btn-switch-lab" title="Switch lab">Switch lab</button>
       <button type="button" class="btn ghost" id="btn-help" title="Help">Help</button>
       <button type="button" class="btn ghost" id="btn-save" title="Ctrl+S">Save notes</button>
@@ -74,6 +82,11 @@
       <section id="tab-notes" class="tab active">
         <div class="notes-toolbar">
           <div class="chips" id="note-cats"></div>
+          <div class="view-modes" role="group" aria-label="Notes view">
+            <button type="button" class="chip active" data-notes-view="split">Split</button>
+            <button type="button" class="chip" data-notes-view="write">Write</button>
+            <button type="button" class="chip" data-notes-view="nice">Nice view</button>
+          </div>
           <div class="toolbar-right">
             <button type="button" class="btn ghost" id="btn-stamp" title="Ctrl+N">Stamp entry</button>
             <button type="button" class="btn ghost" id="btn-heading">##</button>
@@ -89,7 +102,7 @@
             <span class="quiet">Ctrl+Enter appends · full file below stays one continuous .md</span>
           </div>
         </div>
-        <div class="notes-split">
+        <div class="notes-split mode-split" id="notes-split">
           <aside class="tape" id="tape" aria-label="Timestamp rail"></aside>
           <textarea id="notes-editor" spellcheck="false" aria-label="notes.md"></textarea>
           <article id="notes-preview" class="paper" aria-label="Preview"></article>
@@ -288,12 +301,18 @@ git pull
           <h3>Report tab</h3>
           <p>Write in the left pane; the right pane is a live markdown preview (headings, bullets, images). Auto-saves to <code>notes/report_draft.md</code>. Template: Executive Summary, Scope, Methodology, Findings, Attack narrative, Remediation, Conclusion. Paste screenshots with Ctrl+V. Logs and session notes are not dumped in.</p>
 
+          <h3>Pause / resume session logging</h3>
+          <p>Header → <strong>Session ▾</strong> → Pause or Resume. The terminal still works while paused; commands are not written to <code>session.log</code> until you resume. Requires <code>./htb</code> (not <code>--gui-only</code>).</p>
+
+          <h3>Notes: Split / Write / Nice view</h3>
+          <p><strong>Split</strong> is raw markdown on the left and preview on the right. <strong>Write</strong> is the editor only. <strong>Nice view</strong> is the formatted preview (read-only) after you finish writing. Switch back to Write to edit again.</p>
+
           <h3>Logs jump to the bottom</h3>
           <p>Uncheck <strong>Follow</strong>, or scroll up — follow turns off until you scroll to the bottom again.</p>
         </article>
       </section>
     </main>
   </div>
-  <script src="/app.js?v=5"></script>
+  <script src="/app.js?v=6"></script>
 </body>
 </html>
