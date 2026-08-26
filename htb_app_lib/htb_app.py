@@ -1286,7 +1286,7 @@ class Handler(BaseHTTPRequestHandler):
                     ws, encrypt=encrypt, password=password,
                 )
                 host = str(data.get("hostname") or "").strip()
-                user = str(data.get("username") or (STATE["config"] or {}).get("student_id") or "user").strip()
+                user = str(data.get("username") or "htb-username").strip()
                 if host:
                     scp = f"scp {user}@{host}:{archive} ."
                 else:

@@ -209,9 +209,7 @@
     }
     $("meta-machine").textContent = (data.config && data.config.machine_name) || "—";
     $("meta-target").textContent = (data.config && data.config.target_ip) || "—";
-    if ($("pwn-user") && data.config && data.config.student_id && !$("pwn-user").value) {
-      $("pwn-user").value = data.config.student_id;
-    }
+
     let sessionLabel = "idle";
     if (data.session_active && data.session_paused) sessionLabel = "PAUSED";
     else if (data.session_active) sessionLabel = "LIVE";
@@ -878,7 +876,7 @@
     });
     function rebuildScp() {
       const host = ($("pwn-host").value || "htb-xxxxx.htb-cloud.com").trim();
-      const user = ($("pwn-user").value || "USERNAME").trim();
+      const user = ($("pwn-user").value || "htb-username").trim();
       const path = ($("pwn-path").value || "/home/USER/.../file.zip").trim().replace(/\\/g, "/");
       const remote = user + "@" + host + ":" + path;
       $("zip-scp").textContent =
