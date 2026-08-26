@@ -59,10 +59,10 @@ title uses `#`; lab instructions and Workflow use `###`.
 ## 5. Tools
 
 **Tools** tab is categorized (1 Network, 2 Web/Fuzzing, …). Each run
-asks *why*, streams output, and writes a raw `.txt` under
-`<student>_<machine>_logs/`. Including that run in notes.md is a dropdown
-(default **No**). Copy the `tee` line if you want the same save in your
-own terminal.
+asks *why*, streams output, and writes a raw `.txt` under `logs/`.
+Including that run in notes.md is a dropdown (default **No**). Copy the
+`tee` line if you want the same save in your own terminal. Target IP and
+port update that command as you type.
 
 **Tool Info** is the cheat sheet (syntax + flags), grouped in tabs. It
 does not run anything.

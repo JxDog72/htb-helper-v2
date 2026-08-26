@@ -16,6 +16,8 @@
     reportDirty: false,
     cmdDirty: false,
     toolRunning: false,
+    applyingPreview: false,
+    lastOutFile: "",
   };
 
   function escapeHtml(s) {
@@ -157,13 +159,17 @@
     $("save-state").textContent = "saved";
   }
 
-  async function loadNotes() {
-    const data = await api("/api/notes");
-    $("notes-editor").value = data.text || "";
+  function applyNotesText(text) {
+    $("notes-editor").value = text || "";
     state.dirty = false;
     $("save-state").textContent = "saved";
-    $("notes-preview").innerHTML = renderMarkdown(data.text || "");
-    drawTape(data.text || "");
+    $("notes-preview").innerHTML = renderMarkdown(text || "");
+    drawTape(text || "");
+  }
+
+  async function loadNotes() {
+    const data = await api("/api/notes");
+    applyNotesText(data.text || "");
   }
 
   function fillLabSelect(labs, current) {
@@ -378,7 +384,7 @@
     $("tool-extra").value = "";
     $("tool-notes").value = "no";
     state.cmdDirty = false;
-    previewCommand();
+    previewCommand(true);
   }
 
   function toolFields() {
@@ -400,11 +406,17 @@
   let previewTimer = null;
   function schedulePreview() {
     clearTimeout(previewTimer);
-    previewTimer = setTimeout(() => previewCommand().catch(() => {}), 120);
+    previewTimer = setTimeout(() => previewCommand(true).catch(() => {}), 80);
   }
 
-  async function previewCommand() {
-    if (!state.currentTool || state.cmdDirty) return;
+  function teeCopy(cmd, outFile) {
+    const dest = outFile || "logs/tool.txt";
+    return cmd ? `${cmd} | tee "${dest}"` : "";
+  }
+
+  async function previewCommand(force) {
+    if (!state.currentTool) return;
+    if (state.cmdDirty && !force) return;
     try {
       const data = await api("/api/tools/preview", {
         method: "POST",
@@ -415,12 +427,15 @@
           fields: toolFields(),
         }),
       });
+      state.applyingPreview = true;
       $("tool-cmd").value = data.command || "";
-      $("tool-copy").value = data.copy_command || "";
+      $("tool-copy").value = data.copy_command || teeCopy(data.command, data.output_file);
       $("tool-cmd-preview").textContent = data.output_file ? "saves " + data.output_file : "";
+      state.lastOutFile = data.output_file || state.lastOutFile;
+      state.applyingPreview = false;
+      if (force) state.cmdDirty = false;
     } catch (err) {
-      $("tool-cmd").value = "";
-      $("tool-copy").value = "";
+      state.applyingPreview = false;
       $("tool-cmd-preview").textContent = err.message;
     }
   }
@@ -473,6 +488,7 @@
           if (msg.type === "done") {
             $("tool-out").textContent += `\n[exit ${msg.exit_code}] ${msg.output_file || ""}\n`;
             setToolRunning(false);
+            if (msg.notes != null) applyNotesText(msg.notes);
           }
           if (msg.type === "error") {
             $("tool-out").textContent += `\n[-] ${msg.error}`;
@@ -717,16 +733,26 @@
     }));
     $("btn-tool-rebuild").addEventListener("click", () => {
       state.cmdDirty = false;
-      previewCommand().catch(() => {});
+      previewCommand(true).catch(() => {});
     });
-    $("tool-cmd").addEventListener("input", () => {
-      state.cmdDirty = true;
-    });
-    $("tool-form").addEventListener("input", (e) => {
+    function onToolFieldsChanged(e) {
+      if (state.applyingPreview) return;
       const id = e.target && e.target.id;
-      if (id === "tool-cmd" || id === "tool-purpose" || id === "tool-copy" || id === "tool-notes") return;
-      schedulePreview();
-    });
+      const isField = e.target && e.target.hasAttribute && e.target.hasAttribute("data-field");
+      if (id === "tool-purpose" || id === "tool-notes") return;
+      if (id === "tool-copy") return;
+      if (id === "tool-cmd") {
+        state.cmdDirty = true;
+        $("tool-copy").value = teeCopy($("tool-cmd").value.trim(), state.lastOutFile);
+        return;
+      }
+      if (id === "tool-target" || id === "tool-port" || id === "tool-extra" || isField) {
+        state.cmdDirty = false;
+        schedulePreview();
+      }
+    }
+    $("tool-form").addEventListener("input", onToolFieldsChanged);
+    $("tool-form").addEventListener("change", onToolFieldsChanged);
     $("info-search").addEventListener("input", () => renderInfo());
     $("source-na").addEventListener("change", () => {
       $("evidence-source").disabled = $("source-na").checked;
@@ -807,9 +833,38 @@
       const data = await api("/api/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       $("validate-out").textContent = data.text || "";
     });
+    function showExport(data, dest) {
+      dest.textContent = (data.file || "") + (data.copied && data.copied.length ? "  (folders: " + data.copied.join(", ") + ")" : "");
+      const scp = $("zip-scp");
+      if (scp && data.scp) {
+        scp.classList.remove("hidden");
+        scp.textContent = "# on your HOST, with the lab VPN connected:\n" + data.scp;
+      }
+    }
     $("btn-zip").addEventListener("click", async () => {
-      const data = await api("/api/backup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      $("zip-out").textContent = data.file || "";
+      try {
+        const data = await api("/api/backup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        showExport(data, $("zip-out"));
+      } catch (err) {
+        $("zip-out").textContent = err.message;
+      }
+    });
+    $("btn-7z").addEventListener("click", async () => {
+      const password = $("zip-pass").value;
+      if (!password) {
+        $("zip7-out").textContent = "Set a 7z password first.";
+        return;
+      }
+      try {
+        const data = await api("/api/backup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ encrypt: true, password }),
+        });
+        showExport(data, $("zip7-out"));
+      } catch (err) {
+        $("zip7-out").textContent = err.message;
+      }
     });
     $("btn-bootstrap").addEventListener("click", async () => {
       const data = await api("/api/bootstrap", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });

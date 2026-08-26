@@ -115,7 +115,7 @@ def list_labs():
         return labs
     current = STATE["workspace"].name if STATE["workspace"] else None
     for folder in sorted(p for p in root.iterdir() if p.is_dir()):
-        meta = load_or_none(folder / "metadata.json") or {}
+        meta = load_or_none(engine.metadata_path(folder)) or load_or_none(folder / "metadata.json") or {}
         labs.append({
             "id": folder.name,
             "student_id": meta.get("student_id") or "",
@@ -137,9 +137,9 @@ def select_lab(folder_name: str):
         raise RuntimeError("Lab folder must stay inside the machines directory.")
     if not folder.is_dir():
         raise RuntimeError(f"No lab folder named {folder_name}.")
-    meta = load_or_none(folder / "metadata.json") or {}
+    meta = load_or_none(engine.metadata_path(folder)) or load_or_none(folder / "metadata.json") or {}
     if not meta.get("student_id") or not meta.get("machine_name") or not meta.get("target_ip"):
-        raise RuntimeError("That lab folder is missing metadata.json (student, machine, IP).")
+        raise RuntimeError("That lab folder is missing machine_json/metadata.json (student, machine, IP).")
     prev = STATE["config"] or {}
     config = {
         "student_id": meta["student_id"],
@@ -260,6 +260,7 @@ def write_notes(text: str):
     if not path:
         raise RuntimeError("Workspace is not configured yet.")
     with STATE["notes_lock"]:
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
 
 
@@ -771,14 +772,15 @@ def finish_tool_run(tool, command, purpose, description, result, output_file, in
         output_file=rel,
     )
     if include_notes:
-        engine.append_timeline_note(
-            ws,
-            "DEAD END" if result["interrupted"] else category,
-            summary,
-            tool=tool_label,
-            command=format_command(command),
-            metadata={**metadata, "event": "attempt_result"},
-        )
+        with STATE["notes_lock"]:
+            engine.append_timeline_note(
+                ws,
+                "DEAD END" if result["interrupted"] else category,
+                summary,
+                tool=tool_label,
+                command=format_command(command),
+                metadata={**metadata, "event": "attempt_result"},
+            )
     artifact = engine.file_metadata(ws, output_file)
     run_record = {
         "time": human_ts(),
@@ -1259,9 +1261,24 @@ class Handler(BaseHTTPRequestHandler):
                 ws = STATE["workspace"]
                 if not ws:
                     raise RuntimeError("Workspace is not configured yet.")
-                archive_base = ws.parent / f"{ws.name}_{engine.timestamp_seconds()}"
-                archive = shutil.make_archive(str(archive_base), "zip", root_dir=ws.parent, base_dir=ws.name)
-                self._json({"ok": True, "file": archive})
+                encrypt = bool(data.get("encrypt"))
+                password = str(data.get("password") or "")
+                archive, copied, kind = engine.create_export_archive(
+                    ws, encrypt=encrypt, password=password,
+                )
+                vpn = engine.vpn_addresses()
+                pwnbox_ip = vpn[0] if vpn else "<PWNBOX_VPN_IP>"
+                scp = f"scp user@{pwnbox_ip}:{archive} ."
+                self._json({
+                    "ok": True,
+                    "file": archive,
+                    "kind": kind,
+                    "copied": copied,
+                    "vpn_ips": vpn,
+                    "scp": scp,
+                    "seven_zip": bool(engine.seven_zip_bin()),
+                    "name": Path(archive).name,
+                })
                 return
 
             if path == "/api/report":
@@ -1365,7 +1382,7 @@ class Handler(BaseHTTPRequestHandler):
                 "copy_command": f'{cmd} | tee "{rel}"',
             })
             result = run_tool_streaming(command, output_file, lambda line: emit({"type": "line", "text": line}))
-            include_notes = bool(data.get("include_notes"))
+            include_notes = data.get("include_notes") in (True, "yes", "true", 1, "1")
             record = finish_tool_run(
                 tool, command, purpose, description, result, output_file,
                 include_notes=include_notes,
@@ -1374,6 +1391,7 @@ class Handler(BaseHTTPRequestHandler):
                 "type": "done",
                 "exit_code": result["returncode"],
                 "output_file": rel,
+                "notes": read_notes() if include_notes else None,
             })
         except FileNotFoundError:
             emit({"type": "error", "error": f"Command not found: {command[0]}"})

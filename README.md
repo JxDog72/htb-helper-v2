@@ -63,15 +63,15 @@ command `~/htb-helper-v2/htb` → `Ctrl+Alt+H`.
 Per machine, under `machines/<student>_<machine>/`:
 
 ```
-<student>_<machine>_logs/            session.log + captured tool output
-<student>_<machine>_screenshots/
-<student>_<machine>_notes.md         workflow notes (military timestamps)
-<student>_<machine>_evidence.md
-<student>_<machine>_report/          written report + media/
-<student>_<machine>_files_given/     files the lab handed you
-metadata.json
-research_manifest.json
+logs/              session.log + captured tool output
+screenshots/
+notes/             notes.md + evidence.md
+report/            report.md + media/
+files_given/       files the lab handed you
+machine_json/      app-only (not in the ZIP)
 ```
+
+The parent folder is still `student_machine`. ZIP/7z export uses that name and omits `machine_json/`.
 
 GUI sections:
 

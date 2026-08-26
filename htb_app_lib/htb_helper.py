@@ -39,6 +39,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from urllib.parse import urlparse
 
 
@@ -274,42 +275,36 @@ def workspace_slug(workspace):
     return Path(workspace).name
 
 
-def _pick_path(new_path, old_path):
-    if new_path.exists() or not old_path.exists():
-        return new_path
-    return old_path
+def json_dir(workspace):
+    return Path(workspace) / "machine_json"
 
 
 def logs_dir(workspace):
-    workspace = Path(workspace)
-    return _pick_path(workspace / f"{workspace.name}_logs", workspace / "logs")
+    return Path(workspace) / "logs"
 
 
 def screenshots_dir(workspace):
-    workspace = Path(workspace)
-    return _pick_path(workspace / f"{workspace.name}_screenshots", workspace / "screenshots")
+    return Path(workspace) / "screenshots"
+
+
+def notes_dir(workspace):
+    return Path(workspace) / "notes"
 
 
 def notes_file(workspace):
-    workspace = Path(workspace)
-    return _pick_path(workspace / f"{workspace.name}_notes.md", workspace / "notes" / "notes.md")
+    return notes_dir(workspace) / "notes.md"
 
 
 def evidence_file(workspace):
-    workspace = Path(workspace)
-    return _pick_path(workspace / f"{workspace.name}_evidence.md", workspace / "notes" / "evidence.md")
+    return notes_dir(workspace) / "evidence.md"
 
 
 def report_dir(workspace):
-    return Path(workspace) / f"{Path(workspace).name}_report"
+    return Path(workspace) / "report"
 
 
 def report_file(workspace):
-    workspace = Path(workspace)
-    return _pick_path(
-        report_dir(workspace) / f"{workspace.name}_report.md",
-        workspace / "notes" / "report_draft.md",
-    )
+    return report_dir(workspace) / "report.md"
 
 
 def report_media_dir(workspace):
@@ -317,25 +312,14 @@ def report_media_dir(workspace):
 
 
 def files_given_dir(workspace):
-    return Path(workspace) / f"{Path(workspace).name}_files_given"
+    return Path(workspace) / "files_given"
 
 
-def migrate_workspace_layout(workspace):
-    """Move legacy logs/notes/screenshots into studentID_machine_* names."""
-    workspace = Path(workspace)
-    slug = workspace.name
-    mapping = [
-        (workspace / "logs", workspace / f"{slug}_logs"),
-        (workspace / "screenshots", workspace / f"{slug}_screenshots"),
-        (workspace / "notes" / "notes.md", workspace / f"{slug}_notes.md"),
-        (workspace / "notes" / "evidence.md", workspace / f"{slug}_evidence.md"),
-        (workspace / "notes" / "report_draft.md", report_dir(workspace) / f"{slug}_report.md"),
-        (workspace / "notes" / "media", report_media_dir(workspace)),
-    ]
-    for old, new in mapping:
-        if old.exists() and not new.exists():
-            new.parent.mkdir(parents=True, exist_ok=True)
-            old.rename(new)
+def metadata_path(workspace):
+    return json_dir(workspace) / "metadata.json"
+
+
+EXPORT_FOLDERS = ("logs", "screenshots", "notes", "report", "files_given")
 
 
 def last_note_date(text):
@@ -368,7 +352,7 @@ def format_workflow_stamp(existing_text, category=None):
 # ============================================================
 
 def manifest_path(workspace):
-    return workspace / "research_manifest.json"
+    return json_dir(workspace) / "research_manifest.json"
 
 
 def load_manifest(workspace):
@@ -382,7 +366,9 @@ def load_manifest(workspace):
 
 
 def save_manifest(workspace, manifest):
-    manifest_path(workspace).write_text(
+    path = manifest_path(workspace)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         json.dumps(manifest, indent=4),
         encoding="utf-8",
     )
@@ -466,13 +452,14 @@ def update_milestone(workspace, milestone):
 
 def setup_workspace(config):
     workspace = workspace_from_config(config)
-    migrate_workspace_layout(workspace)
     for folder in (
         logs_dir(workspace),
         screenshots_dir(workspace),
+        notes_dir(workspace),
         report_dir(workspace),
         report_media_dir(workspace),
         files_given_dir(workspace),
+        json_dir(workspace),
     ):
         folder.mkdir(parents=True, exist_ok=True)
 
@@ -548,7 +535,7 @@ def setup_workspace(config):
             encoding="utf-8",
         )
 
-    metadata_file = workspace / "metadata.json"
+    metadata_file = metadata_path(workspace)
     if not metadata_file.exists():
         metadata_file.write_text(
             json.dumps({
@@ -628,6 +615,7 @@ def append_timeline_note(
     clean_evidence = unique_preserve(clean_evidence)
 
     path = notes_file(workspace)
+    path.parent.mkdir(parents=True, exist_ok=True)
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
     stamp = format_workflow_stamp(existing, None if compact else category)
     with path.open("a", encoding="utf-8") as handle:
@@ -2163,6 +2151,7 @@ def validate_submission(workspace):
     for label, path in (
         ("logs", logs_dir(workspace)),
         ("screenshots", screenshots_dir(workspace)),
+        ("notes", notes_dir(workspace)),
         ("report", report_dir(workspace)),
         ("files_given", files_given_dir(workspace)),
     ):
@@ -2175,8 +2164,8 @@ def validate_submission(workspace):
     required_files = (
         notes_file(workspace),
         evidence_file(workspace),
-        workspace / "metadata.json",
-        workspace / "research_manifest.json",
+        metadata_path(workspace),
+        manifest_path(workspace),
     )
     for path in required_files:
         if path.exists():
@@ -2264,20 +2253,102 @@ def validate_submission(workspace):
     return not failures
 
 
+def vpn_addresses():
+    """Likely HTB VPN / tun addresses on this box (Pwnbox attacking IP)."""
+    addrs = []
+    try:
+        if os.name == "nt":
+            result = subprocess.run(
+                ["ipconfig"],
+                capture_output=True, text=True, errors="replace", check=False,
+            )
+            for line in result.stdout.splitlines():
+                line = line.strip()
+                if "IPv4" in line and ":" in line:
+                    ip = line.split(":")[-1].strip()
+                    if ip.startswith("10."):
+                        addrs.append(ip)
+        else:
+            result = subprocess.run(
+                ["ip", "-4", "-o", "addr", "show"],
+                capture_output=True, text=True, errors="replace", check=False,
+            )
+            for line in result.stdout.splitlines():
+                if any(tag in line for tag in (" tun", " tap", "tun0", "tap0")):
+                    parts = line.split()
+                    for item in parts:
+                        if "/" in item and item[0].isdigit():
+                            addrs.append(item.split("/")[0])
+    except OSError:
+        pass
+    return addrs
+
+
+def seven_zip_bin():
+    return shutil.which("7z") or shutil.which("7za") or shutil.which("7z.exe")
+
+
+def stage_export_tree(workspace):
+    """Copy report folders only (no machine_json) into a named staging dir."""
+    workspace = Path(workspace)
+    slug = workspace.name
+    root = Path(tempfile.mkdtemp(prefix="htb-export-"))
+    staged = root / slug
+    staged.mkdir()
+    copied = []
+    for name in EXPORT_FOLDERS:
+        src = workspace / name
+        if src.is_dir():
+            shutil.copytree(src, staged / name)
+            copied.append(name)
+    return root, staged, copied
+
+
+def create_export_archive(workspace, *, encrypt=False, password=""):
+    """Zip (or 7z) the lab folders as student_machine/... without machine_json."""
+    workspace = Path(workspace)
+    slug = workspace.name
+    stamp = timestamp_seconds()
+    root, staged, copied = stage_export_tree(workspace)
+    dest_dir = workspace.parent
+    try:
+        if encrypt:
+            binary = seven_zip_bin()
+            if not binary:
+                raise RuntimeError(
+                    "7z is not installed. On Parrot/Kali: sudo apt install p7zip-full"
+                )
+            if not password:
+                raise RuntimeError("A password is required for 7z encryption.")
+            archive = dest_dir / f"{slug}_{stamp}.7z"
+            cmd = [
+                binary, "a", "-t7z", "-mhe=on", f"-p{password}",
+                str(archive), slug,
+            ]
+            result = subprocess.run(
+                cmd, cwd=str(root), check=False,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            )
+            if result.returncode != 0 or not archive.exists():
+                raise RuntimeError(result.stdout.strip() or "7z failed.")
+            return str(archive), copied, "7z"
+        archive_base = dest_dir / f"{slug}_{stamp}"
+        archive = shutil.make_archive(str(archive_base), "zip", root_dir=str(root), base_dir=slug)
+        return archive, copied, "zip"
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def create_zip(workspace):
     print("\n" + "=" * 60)
     print("CREATING ZIP BACKUP")
     print("=" * 60)
-    archive_base = workspace.parent / f"{workspace.name}_{timestamp_seconds()}"
     try:
-        archive = shutil.make_archive(
-            str(archive_base),
-            "zip",
-            root_dir=workspace.parent,
-            base_dir=workspace.name,
-        )
-        print(f"\n[+] Archive created:\n    {archive}")
-    except OSError as exc:
+        archive, copied, kind = create_export_archive(workspace)
+        print(f"\n[+] Archive created ({kind}):\n    {archive}")
+        print(f"[+] Included: {', '.join(copied) or '(empty)'}")
+        print("[+] machine_json/ was left out (app-only).")
+    except Exception as exc:
         print(f"[-] Could not create archive: {exc}")
 
 

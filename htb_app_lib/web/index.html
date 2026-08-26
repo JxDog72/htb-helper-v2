@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=13" />
+  <link rel="stylesheet" href="/app.css?v=14" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c9843a'/></svg>" />
 </head>
 <body>
@@ -123,7 +123,7 @@
 
       <section id="tab-tools" class="tab">
         <div class="tools-layout">
-          <aside class="tool-nav" id="tool-nav"></aside>
+          <nav class="tool-nav" id="tool-nav" aria-label="Tool categories"></nav>
           <div class="tool-panel">
             <h2 id="tool-group-title">Tools</h2>
             <p class="lede" id="tool-group-blurb">Pick a category. Each run asks why and captures raw output to a .txt. Notes are optional.</p>
@@ -153,7 +153,7 @@
               </label>
               <p class="quiet">This is the command the helper will run. Copy the tee line below if you want the same .txt save in your own terminal.</p>
               <label>Copy for your own terminal (saves .txt)
-                <textarea id="tool-copy" rows="2" spellcheck="false" readonly></textarea>
+                <textarea id="tool-copy" rows="2" spellcheck="false" placeholder="Updates when you change IP/port. Edit if you want."></textarea>
               </label>
               <label>Include tool use in notes.md
                 <select id="tool-notes">
@@ -178,10 +178,8 @@
           <input id="info-search" type="search" placeholder="Filter tools (nmap, ffuf, nxc…)" />
           <span class="quiet">Cheat sheet only — running a tool is on the Tools tab. Syntax uses the configured target as $TARGET.</span>
         </div>
-        <div class="tools-layout">
-          <aside class="tool-nav" id="info-nav"></aside>
-          <div id="info-groups" class="info-groups"></div>
-        </div>
+        <nav class="tool-nav" id="info-nav" aria-label="Tool info categories"></nav>
+        <div id="info-groups" class="info-groups"></div>
       </section>
 
       <section id="tab-evidence" class="tab">
@@ -221,7 +219,7 @@
           <button type="button" class="btn copper" id="btn-report">Insert / reset template</button>
           <button type="button" class="btn ghost" id="btn-save-report">Save report</button>
           <span id="report-save-state" class="quiet">saved</span>
-          <span class="quiet">Paste images with Ctrl+V. Saved as studentID_machine_report.md in the report folder.</span>
+          <span class="quiet">Paste images with Ctrl+V. File: report/report.md</span>
         </div>
         <div class="notes-split report-split mode-both" id="report-split">
           <textarea id="report-editor" spellcheck="true" aria-label="report_draft.md" placeholder="# HTB Challenge:&#10;&#10;## Executive Summary&#10;"></textarea>
@@ -268,14 +266,28 @@
             <button type="button" class="btn ghost" id="btn-validate">Run validation</button>
           </div>
           <div>
-            <h2>Export to your host (Pwnbox)</h2>
-            <p class="lede">Creates a ZIP of this machine folder next to <code>machines/</code>. On HTB Pwnbox, download that ZIP to your host through the Pwnbox file manager (right-click the zip → Download), or copy it over VPN with <code>scp</code>.</p>
-            <button type="button" class="btn copper" id="btn-zip">Create ZIP for host</button>
+            <h2>Export to your host</h2>
+            <p class="lede">Packs <code>logs</code>, <code>screenshots</code>, <code>notes</code>, <code>report</code>, and <code>files_given</code> as <code>student_machine_….zip</code> next to <code>machines/</code>. App files in <code>machine_json/</code> stay on the box and are not in the archive.</p>
+            <button type="button" class="btn copper" id="btn-zip">Create ZIP</button>
             <p id="zip-out" class="quiet"></p>
-            <h3>Encrypt and send to yourself</h3>
-            <p class="lede">After the ZIP exists, encrypt it with a password you know, then send the encrypted file to yourself with <a href="https://wormhole.app" target="_blank" rel="noopener">wormhole.app</a> (open that site on Pwnbox, drop the zip, open the link on your host).</p>
-            <pre class="syntax">zip -e studentID_machine_encrypted.zip studentID_machine_*.zip
-# then open https://wormhole.app and upload the encrypted zip</pre>
+            <pre id="zip-scp" class="syntax hidden"></pre>
+            <h3>Pwnbox → host (lab VPN)</h3>
+            <p class="lede">Use the dedicated lab VPN pack on your <strong>host</strong> (or a small VPN VM). Pwnbox username is usually <code>user</code>. After the ZIP is created, on the host run the <code>scp</code> line shown above (it fills in this box’s VPN IP when it can).</p>
+            <pre class="syntax"># on Pwnbox, attacking IP:
+ip -4 addr show tun0
+# on your HOST, connected with the same lab .ovpn:
+scp user@10.10.14.X:/home/user/path/to/student_machine_….zip .</pre>
+            <h3>Encrypt (7z, stronger than zip -e)</h3>
+            <p class="lede">Parrot does not always ship 7z. Install once: <code>sudo apt install p7zip-full</code>. Header encryption (<code>-mhe=on</code>) hides filenames too.</p>
+            <label>7z password
+              <input id="zip-pass" type="password" autocomplete="new-password" placeholder="set a password you will remember" />
+            </label>
+            <button type="button" class="btn ghost" id="btn-7z">Create encrypted 7z</button>
+            <p id="zip7-out" class="quiet"></p>
+            <pre class="syntax">sudo apt install p7zip-full
+7z a -t7z -mhe=on -p myarchive.7z student_machine/</pre>
+            <h3>Own VM (not Pwnbox)</h3>
+            <p class="lede">Skip scp: enable a VirtualBox/VMware <strong>shared folder</strong>, or drag the zip/7z onto your host desktop.</p>
           </div>
           <div>
             <h2>Hotkeys</h2>
@@ -346,7 +358,7 @@ git pull
           <p>Run <code>./htb</code> again. It does <strong>not</strong> overwrite the old log. You get <code>session.log</code>, then <code>session2.log</code>, <code>session3.log</code>, and so on.</p>
 
           <h3>Where is my work?</h3>
-          <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>&lt;slug&gt;_logs/</code>, <code>&lt;slug&gt;_screenshots/</code>, <code>&lt;slug&gt;_notes.md</code>, <code>&lt;slug&gt;_report/</code> (written report + media), and <code>&lt;slug&gt;_files_given/</code>. Notes auto-save. Status → ZIP for a backup you can download off Pwnbox.</p>
+          <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>logs/</code>, <code>screenshots/</code>, <code>notes/</code>, <code>report/</code>, <code>files_given/</code>, and <code>machine_json/</code> (app-only). Status → ZIP/7z packs the first five as <code>student_machine_….zip</code>. Copy it off Pwnbox with the lab VPN <code>scp</code> line, or a shared folder on your own VM.</p>
 
           <h3>Tools IP / port stuck?</h3>
           <p>Lab identity is only the default. On the Tools form, change <strong>Target IP</strong> and <strong>Port</strong> for that run (another host, a new port, etc.). The <strong>Command</strong> box is the line that actually runs — edit it, or use Extra arguments and Reset command. <strong>Stop tool</strong> kills the current helper-launched scan (nmap, ping, gobuster, …) without closing the GUI.</p>
@@ -358,7 +370,7 @@ git pull
           <p><strong>E-001</strong> is just the next evidence number so you can cite it in the report (like a footnote ID).</p>
 
           <h3>Report tab</h3>
-          <p>Use <strong>Display</strong>: 1 Write (editor only, good on small laptops), 2 View (formatted preview), 3 Both (split). Auto-saves to <code>studentID_machine_report.md</code> in the report folder. Paste images with Ctrl+V (they go in that folder’s <code>media/</code>).</p>
+          <p>Use <strong>Display</strong>: 1 Write (editor only, good on small laptops), 2 View (formatted preview), 3 Both (split). Auto-saves to <code>report/report.md</code>. Paste images with Ctrl+V (they go in <code>report/media/</code>).</p>
 
           <h3>Validation [WARN] user_flag</h3>
           <p>That is <em>not</em> asking you to type <code>user_flag</code> in notes. It only means you have not recorded a <strong>user-flag screenshot</strong> yet (Status → or Evidence / screenshot). WARN here is a reminder, not a failure. Same for root_admin_flag and other screenshot milestones.</p>
@@ -375,6 +387,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=13"></script>
+  <script src="/app.js?v=14"></script>
 </body>
 </html>
