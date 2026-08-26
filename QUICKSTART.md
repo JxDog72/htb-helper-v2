@@ -124,6 +124,9 @@ CLI equivalents still work:
 
 ```bash
 ./htb --check
+./htb --cli
 python3 htb_app_lib/htb_helper.py --validate
 python3 htb_app_lib/htb_helper.py --stats
 ```
+
+In `./htb --cli`, option **14** views/changes the machine name or starts a new lab.

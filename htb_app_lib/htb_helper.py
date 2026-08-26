@@ -238,6 +238,12 @@ def load_config(config_path):
         sys.exit(1)
 
 
+def save_config(config_path, config):
+    path = Path(config_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(config, indent=4) + "\n", encoding="utf-8")
+
+
 def validate_config(config):
     for key in ("student_id", "machine_name", "target_ip"):
         if key not in config or not str(config[key]).strip():
@@ -2378,6 +2384,294 @@ def create_zip(workspace):
 
 
 # ============================================================
+# MACHINE / LAB SWITCHING (CLI)
+# ============================================================
+
+def prompt_line(label, default=""):
+    shown = "" if default in (None, "") else str(default)
+    extra = f" [{shown}]" if shown else ""
+    value = input(f"{label}{extra}: ").strip()
+    return shown if not value else value
+
+
+def prompt_port(default=None):
+    shown = "" if default in (None, "", 0) else str(default)
+    extra = f" [{shown}]" if shown else " [none]"
+    raw = input(f"Assigned port{extra}: ").strip()
+    if not raw:
+        if shown:
+            try:
+                return int(shown)
+            except ValueError:
+                return None
+        return None
+    if raw.lower() in ("none", "no", "-"):
+        return None
+    try:
+        port = int(raw)
+    except ValueError:
+        print("[-] Port must be an integer or blank.")
+        return default if default not in (None, "", 0) else None
+    if not 1 <= port <= 65535:
+        print("[-] Port must be between 1 and 65535.")
+        return default if default not in (None, "", 0) else None
+    return port
+
+
+def workspace_root_from_config(config):
+    root = Path(config.get("workspace_root", "./machines")).expanduser()
+    return root
+
+
+def load_lab_metadata(folder):
+    folder = Path(folder)
+    for candidate in (metadata_path(folder), folder / "metadata.json"):
+        if not candidate.exists():
+            continue
+        try:
+            data = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(data, dict):
+            return data
+    return {}
+
+
+def write_lab_metadata(workspace, config):
+    path = metadata_path(workspace)
+    existing = load_lab_metadata(workspace)
+    existing.update({
+        "helper_version": APP_VERSION,
+        "student_id": config["student_id"],
+        "machine_name": config["machine_name"],
+        "target_ip": config["target_ip"],
+        "assigned_port": config.get("target_port"),
+        "research_project": config.get(
+            "research_project",
+            existing.get(
+                "research_project",
+                "HTB Enterprise AI Generated Pentest Report Study",
+            ),
+        ),
+    })
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(existing, indent=4) + "\n", encoding="utf-8")
+
+
+def refresh_notes_machine_header(workspace, old_name, config):
+    path = notes_file(workspace)
+    if not path.exists():
+        return
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    new_name = config["machine_name"]
+    lines = text.splitlines()
+    if lines and (lines[0].strip() == f"# {old_name}" or lines[0].strip() == "# HTB Enterprise Research Notes"):
+        lines[0] = f"# {new_name}"
+    for index, line in enumerate(lines[:16]):
+        if line.startswith("Machine:"):
+            lines[index] = f"Machine: {new_name}"
+        elif line.startswith("Target:"):
+            lines[index] = f"Target: {config['target_ip']}"
+        elif line.startswith("Assigned Port:"):
+            lines[index] = f"Assigned Port: {config.get('target_port') or 'None'}"
+        elif line.startswith("Student ID:"):
+            lines[index] = f"Student ID: {config['student_id']}"
+    new_text = "\n".join(lines)
+    if text.endswith("\n"):
+        new_text += "\n"
+    if new_text != text:
+        path.write_text(new_text, encoding="utf-8")
+
+
+def list_lab_folders(config):
+    root = workspace_root_from_config(config)
+    labs = []
+    if not root.is_dir():
+        return labs
+    for folder in sorted(p for p in root.iterdir() if p.is_dir()):
+        meta = load_lab_metadata(folder)
+        labs.append({
+            "id": folder.name,
+            "path": folder,
+            "student_id": meta.get("student_id") or "",
+            "machine_name": meta.get("machine_name") or folder.name,
+            "target_ip": meta.get("target_ip") or "",
+            "target_port": meta.get("assigned_port"),
+            "research_project": meta.get("research_project") or "",
+        })
+    return labs
+
+
+def print_lab_list(config, workspace):
+    labs = list_lab_folders(config)
+    current = Path(workspace).name if workspace else ""
+    print("\nExisting labs:")
+    if not labs:
+        print("  (none yet)")
+        return labs
+    for index, lab in enumerate(labs, start=1):
+        mark = "  <- current" if lab["id"] == current else ""
+        port = lab["target_port"] or "no port"
+        print(
+            f"  {index}. {lab['id']}  "
+            f"({lab['machine_name']}, {lab['target_ip'] or 'no IP'}, {port}){mark}"
+        )
+    return labs
+
+
+def config_from_lab(folder, previous):
+    meta = load_lab_metadata(folder)
+    if not meta.get("student_id") or not meta.get("machine_name") or not meta.get("target_ip"):
+        print("[-] That lab folder is missing machine_json/metadata.json (student, machine, IP).")
+        return None
+    return {
+        "student_id": meta["student_id"],
+        "machine_name": meta["machine_name"],
+        "target_ip": meta["target_ip"],
+        "target_port": meta.get("assigned_port"),
+        "workspace_root": previous.get("workspace_root", "./machines"),
+        "research_project": meta.get(
+            "research_project",
+            previous.get("research_project", "HTB Enterprise AI Generated Pentest Report Study"),
+        ),
+        "gui_port": previous.get("gui_port", 8765),
+    }
+
+
+def apply_cli_config(config, workspace, config_path, *, old_name=None, renamed_from=None):
+    save_config(config_path, config)
+    workspace = setup_workspace(config)
+    write_lab_metadata(workspace, config)
+    if old_name:
+        refresh_notes_machine_header(workspace, old_name, config)
+    if renamed_from:
+        print(f"[+] Folder renamed:\n    {renamed_from}\n    -> {workspace}")
+    print(f"[+] Active machine: {config['machine_name']}")
+    print(f"[+] Workspace:      {workspace}")
+    return config, workspace
+
+
+def session_blocks_workspace_change(session_active):
+    if not session_active:
+        return False
+    print("\n[-] Session logging is active, so the workspace folder cannot move.")
+    print("    Exit this logged menu (option 15), then run ./htb --cli again")
+    print("    and use option 14 to switch or start a new machine.")
+    return True
+
+
+def change_current_machine(config, workspace, config_path, session_active=False):
+    print("\nChange this lab's machine name / target (same folder if the name slug matches).")
+    old_name = config["machine_name"]
+    old_workspace = Path(workspace).resolve()
+    student = prompt_line("Student ID", config.get("student_id") or "")
+    machine = prompt_line("Machine name", old_name)
+    target = prompt_line("Target IP", config.get("target_ip") or "")
+    port = prompt_port(config.get("target_port"))
+    updated = dict(config)
+    updated["student_id"] = student
+    updated["machine_name"] = machine
+    updated["target_ip"] = target
+    updated["target_port"] = port
+    if not validate_config(updated):
+        return config, workspace
+    new_workspace = workspace_from_config(updated).resolve()
+    if new_workspace != old_workspace:
+        if session_blocks_workspace_change(session_active):
+            return config, workspace
+        if new_workspace.exists():
+            print(f"[-] Cannot rename: {new_workspace} already exists.")
+            return config, workspace
+        old_workspace.rename(new_workspace)
+        return apply_cli_config(
+            updated,
+            new_workspace,
+            config_path,
+            old_name=old_name,
+            renamed_from=old_workspace,
+        )
+    return apply_cli_config(updated, new_workspace, config_path, old_name=old_name)
+
+
+def switch_existing_lab(config, workspace, config_path, session_active=False):
+    if session_blocks_workspace_change(session_active):
+        return config, workspace
+    labs = print_lab_list(config, workspace)
+    if not labs:
+        return config, workspace
+    raw = input("\nSwitch to lab number: ").strip()
+    try:
+        index = int(raw)
+    except ValueError:
+        print("[-] Enter a number from the list.")
+        return config, workspace
+    if not 1 <= index <= len(labs):
+        print("[-] That number is not on the list.")
+        return config, workspace
+    chosen = labs[index - 1]
+    if Path(workspace).name == chosen["id"]:
+        print("[+] Already on that lab.")
+        return config, workspace
+    updated = config_from_lab(chosen["path"], config)
+    if updated is None or not validate_config(updated):
+        return config, workspace
+    return apply_cli_config(updated, chosen["path"], config_path)
+
+
+def start_new_machine(config, workspace, config_path, session_active=False):
+    if session_blocks_workspace_change(session_active):
+        return config, workspace
+    print("\nStart a new machine. The current lab folder is left as-is.")
+    student = prompt_line("Student ID", config.get("student_id") or "")
+    machine = prompt_line("New machine name", "")
+    target = prompt_line("Target IP", "")
+    port = prompt_port(None)
+    updated = dict(config)
+    updated["student_id"] = student
+    updated["machine_name"] = machine
+    updated["target_ip"] = target
+    updated["target_port"] = port
+    if not validate_config(updated):
+        return config, workspace
+    destination = workspace_from_config(updated)
+    if destination.exists():
+        print(f"[!] Folder already exists — switching to it:\n    {destination}")
+    else:
+        print(f"[+] Creating new lab folder:\n    {destination}")
+    return apply_cli_config(updated, destination, config_path)
+
+
+def manage_machine_menu(config, workspace, config_path, session_active=False):
+    print("\n" + "=" * 60)
+    print("MACHINE / LAB")
+    print("=" * 60)
+    print(f"Current machine: {config.get('machine_name')}")
+    print(f"Student:         {config.get('student_id')}")
+    print(f"Target:          {config.get('target_ip')}")
+    print(f"Port:            {config.get('target_port') or 'None'}")
+    print(f"Workspace:       {workspace}")
+    print_lab_list(config, workspace)
+    print("\n1. Keep current (back)")
+    print("2. Change this lab's machine name / IP / port")
+    print("3. Switch to an existing lab")
+    print("4. Start a new machine (new workspace)")
+    choice = input("\nSelect an option: ").strip()
+    if choice in ("", "1"):
+        return config, workspace
+    if choice == "2":
+        return change_current_machine(config, workspace, config_path, session_active)
+    if choice == "3":
+        return switch_existing_lab(config, workspace, config_path, session_active)
+    if choice == "4":
+        return start_new_machine(config, workspace, config_path, session_active)
+    print("\n[-] Invalid option.")
+    return config, workspace
+
+
+# ============================================================
 # HEADER / MENU
 # ============================================================
 
@@ -2411,7 +2705,8 @@ def display_menu(session_active=False):
     print("11. Show research statistics")
     print("12. Validate research data")
     print("13. Create ZIP backup")
-    print("14. Exit")
+    print("14. View / change machine, or start a new one")
+    print("15. Exit")
 
 
 def interactive_mode(config, workspace, config_path, session_active=False):
@@ -2478,6 +2773,11 @@ def interactive_mode(config, workspace, config_path, session_active=False):
             create_zip(workspace)
 
         elif choice == "14":
+            config, workspace = manage_machine_menu(
+                config, workspace, config_path, session_active,
+            )
+
+        elif choice == "15":
             print("\n[+] Exiting.")
             print("[+] Keep a backup of your research data.")
             break

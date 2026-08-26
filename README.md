@@ -45,7 +45,7 @@ a logged shell. Keep it open. Use the browser for notes.
 chmod +x htb install.sh   # needed once if git lost the execute bit
 ./htb                     # GUI + logged shell
 ./htb --gui-only          # browser only, no logged shell
-./htb --cli               # original numbered menu
+./htb --cli               # numbered menu (option 14: view/change machine or start a new lab)
 ./htb --check             # environment check
 ```
 
@@ -138,12 +138,19 @@ which drops `ping.exe` / `ipconfig.exe` / `tracert.exe` output).
 
 ## Original CLI
 
-`htb_helper.py` is still the capture engine and the old menu:
+`htb_helper.py` is still the capture engine and the numbered menu:
 
 ```bash
+./htb --cli
 python3 htb_app_lib/htb_helper.py
 python3 htb_app_lib/htb_helper.py --check
 ```
+
+Menu **14** shows the current machine name and workspace, lets you rename
+this lab (machine / IP / port), switch to an existing folder under
+`machines/`, or start a **new** machine (new workspace; the old one stays).
+While a logged session is active, workspace moves are blocked until you
+exit the menu and run `./htb --cli` again.
 
 ---
 

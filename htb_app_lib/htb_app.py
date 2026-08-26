@@ -1529,7 +1529,7 @@ def parse_args():
     parser.add_argument("--config", default=str(LIB / "config.json"))
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--gui-only", action="store_true", help="Serve the GUI without wrapping a logged shell.")
-    parser.add_argument("--cli", action="store_true", help="Original numbered menu (htb_helper.py).")
+    parser.add_argument("--cli", action="store_true", help="Numbered menu (htb_helper.py). Option 14: view/change machine or start a new lab.")
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--no-bootstrap", action="store_true")
     parser.add_argument("--check", action="store_true")
