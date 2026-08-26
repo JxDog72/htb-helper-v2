@@ -389,19 +389,31 @@ def log_files():
     return names
 
 
-def read_log(name: str, offset: int = 0):
+def read_log(name: str, offset: int = 0, tail: bool = False):
     ws = STATE["workspace"]
     if not ws:
         return {"text": "", "offset": 0, "name": name}
     path = (engine.logs_dir(ws) / name).resolve()
     path.relative_to(engine.logs_dir(ws).resolve())
     if not path.is_file():
-        return {"text": "", "offset": 0, "name": name}
+        return {"text": "", "offset": 0, "name": name, "size": 0, "replace": True}
+    size = path.stat().st_size
+    if tail and offset > 0 and offset <= size:
+        with path.open("rb") as handle:
+            handle.seek(offset)
+            chunk = handle.read()
+        return {
+            "text": decode_log_bytes(chunk),
+            "offset": size,
+            "name": name,
+            "size": size,
+            "replace": False,
+        }
     data = path.read_bytes()
     text = decode_log_bytes(data)
     if len(text) > 400_000:
         text = text[-400_000:]
-    return {"text": text, "offset": len(data), "name": name, "size": len(data), "replace": True}
+    return {"text": text, "offset": size, "name": name, "size": size, "replace": True}
 
 
 def find_screenshot_command():
@@ -1071,7 +1083,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/logs":
                 name = (query.get("name") or ["session.log"])[0]
                 offset = int((query.get("offset") or ["0"])[0] or 0)
-                self._json({"files": log_files(), **read_log(name, offset)})
+                tail = (query.get("tail") or ["0"])[0] in ("1", "true", "yes")
+                self._json({"files": log_files(), **read_log(name, offset, tail=tail)})
                 return
             if path == "/api/stats":
                 self._json(stats_payload())

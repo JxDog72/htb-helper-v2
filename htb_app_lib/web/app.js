@@ -231,9 +231,16 @@
     await loadNotes();
   }
 
+  function speedUpOn() {
+    return !!($("speed-up") && $("speed-up").checked);
+  }
+
   async function refreshLogs(reset) {
     const sel = $("log-select");
-    const data = await api(`/api/logs?name=${encodeURIComponent(state.logName)}&offset=${reset ? 0 : state.logOffset}`);
+    const tail = !reset && speedUpOn();
+    const data = await api(
+      `/api/logs?name=${encodeURIComponent(state.logName)}&offset=${reset ? 0 : state.logOffset}&tail=${tail ? "1" : "0"}`
+    );
     if (data.files) {
       const current = state.logName;
       sel.innerHTML = data.files.map((n) => `<option ${n === current ? "selected" : ""}>${escapeHtml(n)}</option>`).join("");
@@ -962,8 +969,17 @@
         refreshLogs(true).catch(() => {});
       }
     });
+    try {
+      $("speed-up").checked = localStorage.getItem("htb-speed-up") === "1";
+    } catch (err) { /* ignore */ }
+    $("speed-up").addEventListener("change", () => {
+      try {
+        localStorage.setItem("htb-speed-up", $("speed-up").checked ? "1" : "0");
+      } catch (err) { /* ignore */ }
+      if (!$("speed-up").checked) refreshState().catch(() => {});
+    });
     setInterval(() => {
-      refreshState().catch(() => {});
+      if (!speedUpOn()) refreshState().catch(() => {});
       if ($("tab-logs").classList.contains("active") && $("log-live").checked) {
         refreshLogs(false).catch(() => {});
       }

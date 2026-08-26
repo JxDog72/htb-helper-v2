@@ -58,6 +58,9 @@
           <p class="quiet" id="session-menu-hint">No live session</p>
         </div>
       </div>
+      <label class="check" title="Skip 2.5s header polling; logs append instead of full re-read">
+        <input type="checkbox" id="speed-up" /> Speed up
+      </label>
       <button type="button" class="btn ghost" id="btn-switch-lab" title="Switch lab">Switch lab</button>
       <button type="button" class="btn ghost" id="btn-help" title="Help">Help</button>
       <button type="button" class="btn ghost" id="btn-save" title="Ctrl+S">Save notes</button>
@@ -395,11 +398,11 @@ git pull
           <p><strong>Split</strong> is raw markdown on the left and preview on the right. <strong>Write</strong> is the editor only. <strong>Nice view</strong> is the formatted preview (read-only) after you finish writing. Switch back to Write to edit again.</p>
 
           <h3>Logs</h3>
-          <p><strong>Live view</strong> (checked by default) tails the session. Uncheck it on a slow Pwnbox so the GUI does not keep fetching the log. Use <strong>Refresh</strong> when you want a snapshot. Each <code>./htb</code> start gets <code>session.log</code>, then <code>session2.log</code>, and so on.</p>
+          <p>Header <strong>Speed up</strong> (Pwnbox): skips the 2.5s header refresh and, if Logs live view is on, only fetches new log bytes. <strong>Live view</strong> tails the session; uncheck it to stop log polling. Use <strong>Refresh</strong> for a full snapshot. Each <code>./htb</code> start gets <code>session.log</code>, then <code>session2.log</code>, and so on.</p>
         </article>
       </section>
     </main>
   </div>
-  <script src="/app.js?v=22"></script>
+  <script src="/app.js?v=23"></script>
 </body>
 </html>
