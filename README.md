@@ -96,7 +96,9 @@ Notes auto-save. `Ctrl+S` save, `Ctrl+N` stamp, `Ctrl+1`–`8` tabs,
 sudo apt install p7zip-full
 ```
 
-Copy to your Windows host with SCP. Fill hostname and username from HTB **View instance details**. Path is filled after you create the archive. Run this **on the PC**, then type the instance password. No space after `host:`.
+### 1. Pwnbox → host (SCP)
+
+Fill hostname and username from HTB **View instance details**. Path is filled after you create the archive. Run this **on the PC**, then type the instance password. No space after `host:`.
 
 Command Prompt:
 
@@ -110,7 +112,13 @@ PowerShell:
 scp USERNAME@htb-xxxxx.htb-cloud.com:/full/path/to/file.7z $env:USERPROFILE\Downloads\
 ```
 
-Own VM: shared folder or drag-and-drop instead of SCP.
+### 2. Encrypted 7z
+
+Set a password in Status and click **Create encrypted 7z**, then SCP the `.7z` the same way.
+
+### 3. Personal VM
+
+Shared folder or drag-and-drop instead of SCP.
 
 ---
 

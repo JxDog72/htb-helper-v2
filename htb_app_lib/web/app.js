@@ -559,7 +559,11 @@
             const data = await api("/api/image", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ mime: file.type, data: reader.result }),
+              body: JSON.stringify({
+                mime: file.type,
+                data: reader.result,
+                dest: textarea.id === "notes-editor" ? "notes" : "report",
+              }),
             });
             insertAtCursor(textarea, `\n![pasted image](${data.path})\n`);
             if (textarea.id === "report-editor") onReportInput();
@@ -825,12 +829,33 @@
       wrap.classList.remove("mode-write", "mode-view", "mode-both");
       wrap.classList.add("mode-" + mode);
     });
-    $("btn-report").addEventListener("click", async () => {
+    $("btn-report-reset").addEventListener("click", async () => {
+      if ($("report-editor").value.trim() && !confirm("Replace the whole report with a blank template?")) return;
       const data = await api("/api/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       $("report-editor").value = data.text || "";
       onReportInput();
       state.reportDirty = false;
       $("report-save-state").textContent = "saved";
+    });
+    $("btn-report-insert").addEventListener("click", async () => {
+      try {
+        const data = await api("/api/report/findings", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        const ed = $("report-editor");
+        const block = (data.block || "").replace(/\n$/, "") + "\n";
+        const text = ed.value;
+        const marker = "## Findings";
+        const i = text.indexOf(marker);
+        if (i >= 0) {
+          const nl = text.indexOf("\n", i);
+          const pos = nl >= 0 ? nl + 1 : text.length;
+          ed.value = text.slice(0, pos) + "\n" + block + text.slice(pos);
+        } else {
+          ed.value = text + (text.endsWith("\n") || !text ? "" : "\n") + "\n" + block;
+        }
+        onReportInput();
+      } catch (err) {
+        alert(err.message);
+      }
     });
     $("btn-validate").addEventListener("click", async () => {
       const data = await api("/api/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });

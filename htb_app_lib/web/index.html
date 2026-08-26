@@ -216,7 +216,8 @@
               <option value="both" selected>3 — Both (split)</option>
             </select>
           </label>
-          <button type="button" class="btn copper" id="btn-report">Insert / reset template</button>
+          <button type="button" class="btn copper" id="btn-report-insert">Insert findings</button>
+          <button type="button" class="btn ghost" id="btn-report-reset">Reset template</button>
           <button type="button" class="btn ghost" id="btn-save-report">Save report</button>
           <span id="report-save-state" class="quiet">saved</span>
           <span class="quiet">Paste images with Ctrl+V. File: report/report.md</span>
@@ -381,7 +382,7 @@ git pull
           <p><strong>E-001</strong> is just the next evidence number so you can cite it in the report (like a footnote ID).</p>
 
           <h3>Report tab</h3>
-          <p>Use <strong>Display</strong>: 1 Write (editor only, good on small laptops), 2 View (formatted preview), 3 Both (split). Auto-saves to <code>report/report.md</code>. Paste images with Ctrl+V (they go in <code>report/media/</code>).</p>
+          <p>Use <strong>Display</strong>: 1 Write, 2 View, 3 Both. Auto-saves to <code>report/report.md</code>. <strong>Insert findings</strong> drops evidence bullets under Findings without wiping your draft. <strong>Reset template</strong> replaces the whole file. Paste images with Ctrl+V — <code>report/media/</code> is created only when you paste.</p>
 
           <h3>Validation [WARN] user_flag</h3>
           <p>That is <em>not</em> asking you to type <code>user_flag</code> in notes. It only means you have not recorded a <strong>user-flag screenshot</strong> yet (Status → or Evidence / screenshot). WARN here is a reminder, not a failure. Same for root_admin_flag and other screenshot milestones.</p>
@@ -398,6 +399,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=18"></script>
+  <script src="/app.js?v=19"></script>
 </body>
 </html>

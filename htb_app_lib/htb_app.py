@@ -851,7 +851,7 @@ def write_report(text: str):
     path.write_text(text, encoding="utf-8")
 
 
-def save_pasted_image(data_b64: str, mime: str = ""):
+def save_pasted_image(data_b64: str, mime: str = "", dest="report"):
     ws = STATE["workspace"]
     if not ws:
         raise RuntimeError("Workspace is not configured yet.")
@@ -865,12 +865,31 @@ def save_pasted_image(data_b64: str, mime: str = ""):
         ext = "gif"
     elif "webp" in mime:
         ext = "webp"
-    folder = engine.report_media_dir(ws)
+    if dest == "notes":
+        folder = engine.notes_dir(ws) / "media"
+    else:
+        folder = engine.report_media_dir(ws)
     folder.mkdir(parents=True, exist_ok=True)
     name = f"paste_{engine.timestamp_seconds()}.{ext}"
-    dest = folder / name
-    dest.write_bytes(blob)
-    return engine.relative_path(ws, dest)
+    path = folder / name
+    path.write_bytes(blob)
+    return engine.relative_path(ws, path)
+
+
+def findings_insert_block():
+    ws = STATE["workspace"]
+    if not ws:
+        raise RuntimeError("Workspace is not configured yet.")
+    suggestions = evidence_suggestion_lines(ws)
+    if not suggestions:
+        return ""
+    lines = [
+        "Suggested from the evidence log — rewrite in your words, then delete this list.",
+        "",
+    ]
+    lines.extend(suggestions)
+    lines.append("")
+    return "\n".join(lines)
 
 
 def workspace_file(rel: str):
@@ -1290,6 +1309,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": True, "text": text})
                 return
 
+            if path == "/api/report/findings":
+                block = findings_insert_block()
+                if not block:
+                    raise RuntimeError("No evidence entries to insert yet.")
+                self._json({"ok": True, "block": block})
+                return
+
             if path == "/api/session":
                 action = str(data.get("action") or "").strip().lower()
                 if action not in ("pause", "resume"):
@@ -1308,6 +1334,7 @@ class Handler(BaseHTTPRequestHandler):
                 rel = save_pasted_image(
                     data.get("data") or "",
                     data.get("mime") or "",
+                    dest=str(data.get("dest") or "report"),
                 )
                 self._json({"ok": True, "path": rel})
                 return

@@ -457,7 +457,6 @@ def setup_workspace(config):
         screenshots_dir(workspace),
         notes_dir(workspace),
         report_dir(workspace),
-        report_media_dir(workspace),
         files_given_dir(workspace),
         json_dir(workspace),
     ):

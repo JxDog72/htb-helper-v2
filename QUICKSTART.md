@@ -72,28 +72,12 @@ You can still type nmap/gobuster yourself in the logged terminal.
 ## 6. Finish and export
 
 1. Evidence + screenshots for milestones
-2. Status → **Create ZIP**, or set a password and **Create encrypted 7z**
-3. Copy the archive to your host (Pwnbox SCP below, or a shared folder)
+2. Status → **Create ZIP** (or encrypted 7z)
+3. Copy the archive to your host using one of the three methods below
 4. `exit` the logged shell
 5. Keep the archive
 
-### Encrypted 7z (on Pwnbox)
-
-Parrot may not include 7z until you install it:
-
-```bash
-sudo apt install p7zip-full
-```
-
-In **Status**: set a 7z password → **Create encrypted 7z**. The file is written **next to** `machines/` (not inside the lab folder). Header encryption (`-mhe=on`) hides filenames.
-
-Manual equivalent:
-
-```bash
-7z a -t7z -mhe=on -p /path/to/student_machine_TIMESTAMP.7z student_machine/
-```
-
-### Pwnbox → Windows (SCP)
+### 1. Pwnbox → host (SCP)
 
 Use **View instance details** on HTB: hostname, username, password.
 
@@ -116,7 +100,25 @@ scp USERNAME@htb-xxxxx.htb-cloud.com:/full/path/to/file.zip $env:USERPROFILE\Dow
 
 `$HOME\Downloads` does **not** work in Command Prompt. A space after `host:` makes scp try to download `./` and fail with `not a regular file`.
 
-Own VM (not Pwnbox): skip SCP — use a VirtualBox/VMware shared folder or drag-and-drop.
+### 2. Encrypted 7z
+
+Parrot may not include 7z until you install it:
+
+```bash
+sudo apt install p7zip-full
+```
+
+In **Status**: set a 7z password → **Create encrypted 7z**. The file is written **next to** `machines/` (not inside the lab folder). Header encryption (`-mhe=on`) hides filenames. Then SCP that `.7z` the same way as above.
+
+Manual equivalent:
+
+```bash
+7z a -t7z -mhe=on -p /path/to/student_machine_TIMESTAMP.7z student_machine/
+```
+
+### 3. Personal VM
+
+Skip SCP. Use a VirtualBox/VMware **shared folder**, or drag the zip/7z onto your host desktop.
 
 CLI equivalents still work:
 
