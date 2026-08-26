@@ -841,8 +841,23 @@
       try {
         const data = await api("/api/report/findings", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
         const ed = $("report-editor");
-        const block = (data.block || "").replace(/\n$/, "") + "\n";
         const text = ed.value;
+        const already = new Set();
+        const idRe = /\bE-\d+\b/gi;
+        let m;
+        while ((m = idRe.exec(text))) already.add(m[0].toUpperCase());
+        const lines = String(data.block || "").split("\n");
+        const fresh = lines.filter((line) => {
+          const hit = line.match(/\bE-\d+\b/i);
+          if (!hit) return true;
+          return !already.has(hit[0].toUpperCase());
+        });
+        const hasNew = fresh.some((line) => /^\s*-\s/.test(line) && /\bE-\d+\b/i.test(line));
+        if (!hasNew) {
+          alert("No new evidence IDs to insert. Existing E-numbers are already in the report.");
+          return;
+        }
+        const block = fresh.join("\n").replace(/\n+$/, "") + "\n";
         const marker = "## Findings";
         const i = text.indexOf(marker);
         if (i >= 0) {
