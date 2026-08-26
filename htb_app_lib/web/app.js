@@ -836,14 +836,25 @@
       const data = await api("/api/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       $("validate-out").textContent = data.text || "";
     });
+    function rebuildScp() {
+      const host = ($("pwn-host").value || "htb-xxxxx.htb-cloud.com").trim();
+      const user = ($("pwn-user").value || "USERNAME").trim();
+      const path = ($("pwn-path").value || "/home/USER/.../file.zip").trim().replace(/\\/g, "/");
+      const remote = user + "@" + host + ":" + path;
+      $("zip-scp").textContent =
+        "Windows Command Prompt:\n" +
+        "scp " + remote + " %USERPROFILE%\\Downloads\\\n\n" +
+        "Windows PowerShell:\n" +
+        "scp " + remote + " $env:USERPROFILE\\Downloads\\";
+    }
     function showExport(data, dest) {
       dest.textContent = "Saved: " + (data.file || "") + (data.copied && data.copied.length ? "  [" + data.copied.join(", ") + "]" : "");
-      const scp = $("zip-scp");
-      if (scp && data.scp) {
-        scp.classList.remove("hidden");
-        scp.textContent = "# on your HOST, with the lab VPN connected:\n" + data.scp;
-      }
+      if (data.file) $("pwn-path").value = data.file;
+      rebuildScp();
     }
+    ["pwn-host", "pwn-user", "pwn-path"].forEach((id) => {
+      $(id).addEventListener("input", rebuildScp);
+    });
     $("btn-zip").addEventListener("click", async () => {
       try {
         const data = await api("/api/backup", {

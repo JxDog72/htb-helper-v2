@@ -270,16 +270,18 @@
             <p class="lede">Packs <code>logs</code>, <code>screenshots</code>, <code>notes</code>, <code>report</code>, and <code>files_given</code> as <code>student_machine_….zip</code> next to <code>machines/</code>. App files in <code>machine_json/</code> stay on the box and are not in the archive.</p>
             <button type="button" class="btn copper" id="btn-zip">Create ZIP</button>
             <p id="zip-out" class="quiet"></p>
-            <pre id="zip-scp" class="syntax hidden"></pre>
             <h3>Pwnbox → host (SCP)</h3>
-            <p class="lede">Yes — HTB wants you to copy files with <strong>SCP</strong> using <strong>View instance details</strong>: hostname, username, and password. Run this on your <em>host</em> (not inside Pwnbox). You will be prompted for the instance password.</p>
+            <p class="lede">From <strong>View instance details</strong> fill hostname and username. Path is the archive on Pwnbox (filled after Create ZIP / 7z). Run the command on your <strong>Windows PC</strong>, then enter the instance password. No space after the colon.</p>
             <label>Pwnbox hostname
               <input id="pwn-host" placeholder="htb-xxxxx.htb-cloud.com" autocomplete="off" />
             </label>
             <label>Pwnbox username
               <input id="pwn-user" placeholder="your HTB username" autocomplete="off" />
             </label>
-            <pre class="syntax">scp USERNAME@HOSTNAME:/full/path/to/archive.7z .</pre>
+            <label>Path (file on Pwnbox)
+              <input id="pwn-path" placeholder="/home/you/…/machines/student_machine_….zip" autocomplete="off" />
+            </label>
+            <pre id="zip-scp" class="syntax">scp USER@HOST:/path/file.zip %USERPROFILE%\Downloads\</pre>
             <h3>Encrypt (7z, stronger than zip -e)</h3>
             <p class="lede">Parrot does not always ship 7z. Install once: <code>sudo apt install p7zip-full</code>. Header encryption (<code>-mhe=on</code>) hides filenames too.</p>
             <label>7z password
@@ -361,7 +363,7 @@ git pull
           <p>Run <code>./htb</code> again. It does <strong>not</strong> overwrite the old log. You get <code>session.log</code>, then <code>session2.log</code>, <code>session3.log</code>, and so on.</p>
 
           <h3>Where is my work?</h3>
-          <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>logs/</code>, <code>screenshots/</code>, <code>notes/</code> (notes.md + evidence.md), <code>report/</code>, <code>files_given/</code>, and <code>machine_json/</code> (app-only). Status → ZIP/7z writes next to <code>machines/</code> with folders named <code>student_machine_notes</code> etc. Copy off Pwnbox with SCP using hostname/username from View instance details.</p>
+          <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>logs/</code>, <code>screenshots/</code>, <code>notes/</code> (notes.md + evidence.md), <code>report/</code>, <code>files_given/</code>, and <code>machine_json/</code> (app-only). Status → ZIP/7z writes next to <code>machines/</code>. On Windows, <code>scp user@host:/full/path/file.zip %USERPROFILE%\Downloads\</code> — no space after the colon. <code>$HOME</code> is not valid in Command Prompt.</p>
 
           <h3>Tools IP / port stuck?</h3>
           <p>Lab identity is only the default. On the Tools form, change <strong>Target IP</strong> and <strong>Port</strong> for that run (another host, a new port, etc.). The <strong>Command</strong> box is the line that actually runs — edit it, or use Extra arguments and Reset command. <strong>Stop tool</strong> kills the current helper-launched scan (nmap, ping, gobuster, …) without closing the GUI.</p>
@@ -390,6 +392,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=15"></script>
+  <script src="/app.js?v=17"></script>
 </body>
 </html>
