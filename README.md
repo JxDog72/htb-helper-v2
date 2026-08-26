@@ -71,7 +71,7 @@ files_given/       files the lab handed you
 machine_json/      app-only (not in the ZIP)
 ```
 
-The parent folder is still `student_machine`. ZIP/7z export uses that name and omits `machine_json/`.
+The parent folder is still `student_machine`. ZIP/7z export (next to `machines/`) uses that name and contains `student_machine_logs/`, `_screenshots/`, `_notes/` (notes.md + evidence.md), `_report/`, `_files_given/`. `machine_json/` is omitted.
 
 GUI sections:
 

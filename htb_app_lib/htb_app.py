@@ -775,7 +775,7 @@ def finish_tool_run(tool, command, purpose, description, result, output_file, in
         with STATE["notes_lock"]:
             engine.append_timeline_note(
                 ws,
-                "DEAD END" if result["interrupted"] else category,
+                "TOOL",
                 summary,
                 tool=tool_label,
                 command=format_command(command),
@@ -1266,15 +1266,19 @@ class Handler(BaseHTTPRequestHandler):
                 archive, copied, kind = engine.create_export_archive(
                     ws, encrypt=encrypt, password=password,
                 )
-                vpn = engine.vpn_addresses()
-                pwnbox_ip = vpn[0] if vpn else "<PWNBOX_VPN_IP>"
-                scp = f"scp user@{pwnbox_ip}:{archive} ."
+                host = str(data.get("hostname") or "").strip()
+                user = str(data.get("username") or (STATE["config"] or {}).get("student_id") or "user").strip()
+                if host:
+                    scp = f"scp {user}@{host}:{archive} ."
+                else:
+                    scp = (
+                        f"scp {user}@htb-YOURINSTANCE.htb-cloud.com:{archive} ."
+                    )
                 self._json({
                     "ok": True,
-                    "file": archive,
+                    "file": str(Path(archive).resolve()),
                     "kind": kind,
                     "copied": copied,
-                    "vpn_ips": vpn,
                     "scp": scp,
                     "seven_zip": bool(engine.seven_zip_bin()),
                     "name": Path(archive).name,

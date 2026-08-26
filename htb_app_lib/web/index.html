@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=14" />
+  <link rel="stylesheet" href="/app.css?v=15" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c9843a'/></svg>" />
 </head>
 <body>
@@ -97,7 +97,7 @@
         </div>
         <div class="quick-add">
           <label class="quiet">Quick add — markdown is allowed (headings, lists, fenced code)</label>
-          <textarea id="quick-body" rows="4" placeholder="What I tried&#10;&#10;- bullet&#10;&#10;```python&#10;print('this actually works now')&#10;```"></textarea>
+          <textarea id="quick-body" rows="4" placeholder="What I tried&#10;&#10;- bullet&#10;&#10;```python&#10;print(&quot;Hello World&quot;)&#10;```"></textarea>
           <div class="row">
             <button type="button" class="btn copper" id="btn-append">Append to notes.md</button>
             <span class="quiet">Ctrl+Enter appends · full file below stays one continuous .md</span>
@@ -271,12 +271,15 @@
             <button type="button" class="btn copper" id="btn-zip">Create ZIP</button>
             <p id="zip-out" class="quiet"></p>
             <pre id="zip-scp" class="syntax hidden"></pre>
-            <h3>Pwnbox → host (lab VPN)</h3>
-            <p class="lede">Use the dedicated lab VPN pack on your <strong>host</strong> (or a small VPN VM). Pwnbox username is usually <code>user</code>. After the ZIP is created, on the host run the <code>scp</code> line shown above (it fills in this box’s VPN IP when it can).</p>
-            <pre class="syntax"># on Pwnbox, attacking IP:
-ip -4 addr show tun0
-# on your HOST, connected with the same lab .ovpn:
-scp user@10.10.14.X:/home/user/path/to/student_machine_….zip .</pre>
+            <h3>Pwnbox → host (SCP)</h3>
+            <p class="lede">Yes — HTB wants you to copy files with <strong>SCP</strong> using <strong>View instance details</strong>: hostname, username, and password. Run this on your <em>host</em> (not inside Pwnbox). You will be prompted for the instance password.</p>
+            <label>Pwnbox hostname
+              <input id="pwn-host" placeholder="htb-xxxxx.htb-cloud.com" autocomplete="off" />
+            </label>
+            <label>Pwnbox username
+              <input id="pwn-user" placeholder="your HTB username" autocomplete="off" />
+            </label>
+            <pre class="syntax">scp USERNAME@HOSTNAME:/full/path/to/archive.7z .</pre>
             <h3>Encrypt (7z, stronger than zip -e)</h3>
             <p class="lede">Parrot does not always ship 7z. Install once: <code>sudo apt install p7zip-full</code>. Header encryption (<code>-mhe=on</code>) hides filenames too.</p>
             <label>7z password
@@ -358,7 +361,7 @@ git pull
           <p>Run <code>./htb</code> again. It does <strong>not</strong> overwrite the old log. You get <code>session.log</code>, then <code>session2.log</code>, <code>session3.log</code>, and so on.</p>
 
           <h3>Where is my work?</h3>
-          <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>logs/</code>, <code>screenshots/</code>, <code>notes/</code>, <code>report/</code>, <code>files_given/</code>, and <code>machine_json/</code> (app-only). Status → ZIP/7z packs the first five as <code>student_machine_….zip</code>. Copy it off Pwnbox with the lab VPN <code>scp</code> line, or a shared folder on your own VM.</p>
+          <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>logs/</code>, <code>screenshots/</code>, <code>notes/</code> (notes.md + evidence.md), <code>report/</code>, <code>files_given/</code>, and <code>machine_json/</code> (app-only). Status → ZIP/7z writes next to <code>machines/</code> with folders named <code>student_machine_notes</code> etc. Copy off Pwnbox with SCP using hostname/username from View instance details.</p>
 
           <h3>Tools IP / port stuck?</h3>
           <p>Lab identity is only the default. On the Tools form, change <strong>Target IP</strong> and <strong>Port</strong> for that run (another host, a new port, etc.). The <strong>Command</strong> box is the line that actually runs — edit it, or use Extra arguments and Reset command. <strong>Stop tool</strong> kills the current helper-launched scan (nmap, ping, gobuster, …) without closing the GUI.</p>
@@ -387,6 +390,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=14"></script>
+  <script src="/app.js?v=15"></script>
 </body>
 </html>

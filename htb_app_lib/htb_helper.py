@@ -531,7 +531,7 @@ def setup_workspace(config):
     given = files_given_dir(workspace) / "README.txt"
     if not given.exists():
         given.write_text(
-            "Drop files the HTB lab gave you (VPN pack, wordlists, binaries) in this folder.\n",
+            "Include any files you were given for this lab\n",
             encoding="utf-8",
         )
 
@@ -2289,28 +2289,52 @@ def seven_zip_bin():
 
 
 def stage_export_tree(workspace):
-    """Copy report folders only (no machine_json) into a named staging dir."""
-    workspace = Path(workspace)
+    """Stage report folders as student_machine_logs, _notes, etc. No machine_json."""
+    workspace = Path(workspace).resolve()
     slug = workspace.name
     root = Path(tempfile.mkdtemp(prefix="htb-export-"))
     staged = root / slug
     staged.mkdir()
+    mapping = {
+        "logs": f"{slug}_logs",
+        "screenshots": f"{slug}_screenshots",
+        "notes": f"{slug}_notes",
+        "report": f"{slug}_report",
+        "files_given": f"{slug}_files_given",
+    }
     copied = []
-    for name in EXPORT_FOLDERS:
-        src = workspace / name
+    for src_name, dest_name in mapping.items():
+        src = workspace / src_name
+        dest = staged / dest_name
+        dest.mkdir(parents=True, exist_ok=True)
         if src.is_dir():
-            shutil.copytree(src, staged / name)
-            copied.append(name)
+            for item in src.iterdir():
+                target = dest / item.name
+                if item.is_dir():
+                    shutil.copytree(item, target, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(item, target)
+        copied.append(dest_name)
+    notes_dest = staged / f"{slug}_notes"
+    notes_dest.mkdir(parents=True, exist_ok=True)
+    for src in (notes_file(workspace), evidence_file(workspace)):
+        if src.is_file():
+            shutil.copy2(src, notes_dest / src.name)
+    for stray in ("notes.md", "evidence.md"):
+        src = workspace / stray
+        if src.is_file() and not (notes_dest / stray).exists():
+            shutil.copy2(src, notes_dest / stray)
     return root, staged, copied
 
 
 def create_export_archive(workspace, *, encrypt=False, password=""):
-    """Zip (or 7z) the lab folders as student_machine/... without machine_json."""
-    workspace = Path(workspace)
+    """Zip (or 7z) using absolute paths so 7z does not write into the temp cwd."""
+    workspace = Path(workspace).resolve()
     slug = workspace.name
     stamp = timestamp_seconds()
     root, staged, copied = stage_export_tree(workspace)
-    dest_dir = workspace.parent
+    dest_dir = workspace.parent.resolve()
+    dest_dir.mkdir(parents=True, exist_ok=True)
     try:
         if encrypt:
             binary = seven_zip_bin()
@@ -2329,12 +2353,14 @@ def create_export_archive(workspace, *, encrypt=False, password=""):
                 cmd, cwd=str(root), check=False,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
             )
-            if result.returncode != 0 or not archive.exists():
+            if result.returncode != 0 or not archive.is_file():
                 raise RuntimeError(result.stdout.strip() or "7z failed.")
             return str(archive), copied, "7z"
         archive_base = dest_dir / f"{slug}_{stamp}"
-        archive = shutil.make_archive(str(archive_base), "zip", root_dir=str(root), base_dir=slug)
-        return archive, copied, "zip"
+        archive = shutil.make_archive(
+            str(archive_base), "zip", root_dir=str(root), base_dir=slug,
+        )
+        return str(Path(archive).resolve()), copied, "zip"
     finally:
         shutil.rmtree(root, ignore_errors=True)
 

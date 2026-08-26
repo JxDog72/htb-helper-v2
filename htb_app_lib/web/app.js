@@ -1,6 +1,6 @@
 (() => {
   const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "convert", "status", "help"];
-  const CATS = ["NONE", "RECON", "ENUMERATION", "FINDING", "DEAD END", "FOOTHOLD", "PRIVESC", "FLAG", "OTHER"];
+  const CATS = ["NONE", "RECON", "ENUMERATION", "FINDING", "DEAD END", "FOOTHOLD", "PRIVESC", "FLAG", "TOOL", "OTHER"];
 
   const $ = (id) => document.getElementById(id);
   const state = {
@@ -182,7 +182,7 @@
     }
     block.classList.remove("hidden");
     sel.innerHTML = labs.map((lab) => {
-      const label = `${lab.machine_name || lab.id}  ${lab.target_ip || ""}`.trim();
+      const label = lab.machine_name || lab.id;
       const selected = lab.id === current || lab.current ? " selected" : "";
       return `<option value="${escapeHtml(lab.id)}"${selected}>${escapeHtml(label)}</option>`;
     }).join("");
@@ -209,6 +209,9 @@
     }
     $("meta-machine").textContent = (data.config && data.config.machine_name) || "—";
     $("meta-target").textContent = (data.config && data.config.target_ip) || "—";
+    if ($("pwn-user") && data.config && data.config.student_id && !$("pwn-user").value) {
+      $("pwn-user").value = data.config.student_id;
+    }
     let sessionLabel = "idle";
     if (data.session_active && data.session_paused) sessionLabel = "PAUSED";
     else if (data.session_active) sessionLabel = "LIVE";
@@ -834,7 +837,7 @@
       $("validate-out").textContent = data.text || "";
     });
     function showExport(data, dest) {
-      dest.textContent = (data.file || "") + (data.copied && data.copied.length ? "  (folders: " + data.copied.join(", ") + ")" : "");
+      dest.textContent = "Saved: " + (data.file || "") + (data.copied && data.copied.length ? "  [" + data.copied.join(", ") + "]" : "");
       const scp = $("zip-scp");
       if (scp && data.scp) {
         scp.classList.remove("hidden");
@@ -843,7 +846,14 @@
     }
     $("btn-zip").addEventListener("click", async () => {
       try {
-        const data = await api("/api/backup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        const data = await api("/api/backup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            hostname: $("pwn-host").value,
+            username: $("pwn-user").value,
+          }),
+        });
         showExport(data, $("zip-out"));
       } catch (err) {
         $("zip-out").textContent = err.message;
@@ -859,7 +869,12 @@
         const data = await api("/api/backup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ encrypt: true, password }),
+          body: JSON.stringify({
+            encrypt: true,
+            password,
+            hostname: $("pwn-host").value,
+            username: $("pwn-user").value,
+          }),
         });
         showExport(data, $("zip7-out"));
       } catch (err) {
