@@ -69,18 +69,59 @@ does not run anything.
 
 You can still type nmap/gobuster yourself in the logged terminal.
 
-## 6. Finish
+## 6. Finish and export
 
 1. Evidence + screenshots for milestones
-2. Status → ZIP for host (download off Pwnbox)
-3. Optional: `zip -e` then send via https://wormhole.app
+2. Status → **Create ZIP**, or set a password and **Create encrypted 7z**
+3. Copy the archive to your host (Pwnbox SCP below, or a shared folder)
 4. `exit` the logged shell
-5. Keep the ZIP
+5. Keep the archive
+
+### Encrypted 7z (on Pwnbox)
+
+Parrot may not include 7z until you install it:
+
+```bash
+sudo apt install p7zip-full
+```
+
+In **Status**: set a 7z password → **Create encrypted 7z**. The file is written **next to** `machines/` (not inside the lab folder). Header encryption (`-mhe=on`) hides filenames.
+
+Manual equivalent:
+
+```bash
+7z a -t7z -mhe=on -p /path/to/student_machine_TIMESTAMP.7z student_machine/
+```
+
+### Pwnbox → Windows (SCP)
+
+Use **View instance details** on HTB: hostname, username, password.
+
+1. On Pwnbox, Status fills **Path** after you create the ZIP/7z (full path, e.g. `…/machines/jxdog72_htb-lab_4_….zip`).
+2. On your **Windows PC** (not inside Pwnbox), run **one** of these. **No space after the colon.**
+
+Command Prompt:
+
+```text
+scp USERNAME@htb-xxxxx.htb-cloud.com:/full/path/to/file.zip %USERPROFILE%\Downloads\
+```
+
+PowerShell:
+
+```text
+scp USERNAME@htb-xxxxx.htb-cloud.com:/full/path/to/file.zip $env:USERPROFILE\Downloads\
+```
+
+3. Enter the instance password when prompted.
+
+`$HOME\Downloads` does **not** work in Command Prompt. A space after `host:` makes scp try to download `./` and fail with `not a regular file`.
+
+Own VM (not Pwnbox): skip SCP — use a VirtualBox/VMware shared folder or drag-and-drop.
 
 CLI equivalents still work:
 
 ```bash
 ./htb --check
-python3 htb_helper.py --validate
-python3 htb_helper.py --stats
+python3 htb_app_lib/htb_helper.py --validate
+python3 htb_app_lib/htb_helper.py --stats
 ```

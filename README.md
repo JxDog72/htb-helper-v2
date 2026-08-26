@@ -71,7 +71,7 @@ files_given/       files the lab handed you
 machine_json/      app-only (not in the ZIP)
 ```
 
-The parent folder is still `student_machine`. ZIP/7z export (next to `machines/`) uses that name and contains `student_machine_logs/`, `_screenshots/`, `_notes/` (notes.md + evidence.md), `_report/`, `_files_given/`. `machine_json/` is omitted.
+The parent folder is still `student_machine`. ZIP/7z export is written **next to** `machines/` (not inside the lab folder) and contains `student_machine_logs/`, `_screenshots/`, `_notes/` (notes.md + evidence.md), `_report/`, `_files_given/`. `machine_json/` is omitted.
 
 GUI sections:
 
@@ -81,10 +81,36 @@ GUI sections:
 | Logs | Live tail of `session.log` (new file each `./htb` start) |
 | Tools | Categories with sub-tools. Edit the command; copy a `tee` line for your own terminal; **Stop tool**; notes save is optional (default No). |
 | Tool Info | Cheat sheet with category tabs, CyberChef, official CVE links, ICS/Modbus |
-| Evidence / Files / Report / Status | Evidence without hashes. Status ZIP is for getting the folder off Pwnbox (optional encrypt + [wormhole.app](https://wormhole.app)). |
+| Evidence / Files / Report / Status | Evidence without hashes. Status: ZIP or password-protected 7z, then SCP off Pwnbox. |
 
 Notes auto-save. `Ctrl+S` save, `Ctrl+N` stamp, `Ctrl+1`–`8` tabs,
 `Ctrl+Enter` appends the quick-add box.
+
+---
+
+## Export off Pwnbox
+
+**Status** tab → **Create ZIP**, or install 7z and **Create encrypted 7z** (password box). Archive lands next to `machines/`.
+
+```bash
+sudo apt install p7zip-full
+```
+
+Copy to your Windows host with SCP. Fill hostname and username from HTB **View instance details**. Path is filled after you create the archive. Run this **on the PC**, then type the instance password. No space after `host:`.
+
+Command Prompt:
+
+```text
+scp USERNAME@htb-xxxxx.htb-cloud.com:/full/path/to/file.7z %USERPROFILE%\Downloads\
+```
+
+PowerShell:
+
+```text
+scp USERNAME@htb-xxxxx.htb-cloud.com:/full/path/to/file.7z $env:USERPROFILE\Downloads\
+```
+
+Own VM: shared folder or drag-and-drop instead of SCP.
 
 ---
 

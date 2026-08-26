@@ -363,7 +363,13 @@ git pull
           <p>Run <code>./htb</code> again. It does <strong>not</strong> overwrite the old log. You get <code>session.log</code>, then <code>session2.log</code>, <code>session3.log</code>, and so on.</p>
 
           <h3>Where is my work?</h3>
-          <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>logs/</code>, <code>screenshots/</code>, <code>notes/</code> (notes.md + evidence.md), <code>report/</code>, <code>files_given/</code>, and <code>machine_json/</code> (app-only). Status → ZIP/7z writes next to <code>machines/</code>. On Windows, <code>scp user@host:/full/path/file.zip %USERPROFILE%\Downloads\</code> — no space after the colon. <code>$HOME</code> is not valid in Command Prompt.</p>
+          <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>logs/</code>, <code>screenshots/</code>, <code>notes/</code> (notes.md + evidence.md), <code>report/</code>, <code>files_given/</code>, and <code>machine_json/</code> (app-only).</p>
+
+          <h3>Export ZIP / 7z and copy off Pwnbox</h3>
+          <p>Status → <strong>Create ZIP</strong>, or set a password and <strong>Create encrypted 7z</strong> (<code>sudo apt install p7zip-full</code> once). The file is <strong>next to</strong> <code>machines/</code>, not inside the lab folder.</p>
+          <p>On your Windows PC, use hostname + username from <strong>View instance details</strong>. Path is filled after you create the archive. <strong>No space after the colon.</strong> Command Prompt uses <code>%USERPROFILE%\Downloads\</code> (not <code>$HOME</code>).</p>
+          <pre class="syntax">scp USER@htb-xxxxx.htb-cloud.com:/full/path/to/file.zip %USERPROFILE%\Downloads\</pre>
+          <p>PowerShell: same line but <code>$env:USERPROFILE\Downloads\</code>. Enter the instance password when asked. Own VM: shared folder or drag-and-drop.</p>
 
           <h3>Tools IP / port stuck?</h3>
           <p>Lab identity is only the default. On the Tools form, change <strong>Target IP</strong> and <strong>Port</strong> for that run (another host, a new port, etc.). The <strong>Command</strong> box is the line that actually runs — edit it, or use Extra arguments and Reset command. <strong>Stop tool</strong> kills the current helper-launched scan (nmap, ping, gobuster, …) without closing the GUI.</p>
@@ -392,6 +398,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=17"></script>
+  <script src="/app.js?v=18"></script>
 </body>
 </html>
