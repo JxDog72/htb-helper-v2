@@ -1,11 +1,11 @@
 (() => {
   const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "convert", "status", "help"];
-  const CATS = ["RECON", "ENUMERATION", "FINDING", "DEAD END", "FOOTHOLD", "PRIVESC", "FLAG", "OTHER"];
+  const CATS = ["NONE", "RECON", "ENUMERATION", "FINDING", "DEAD END", "FOOTHOLD", "PRIVESC", "FLAG", "OTHER"];
 
   const $ = (id) => document.getElementById(id);
   const state = {
     dirty: false,
-    category: "RECON",
+    category: "NONE",
     logOffset: 0,
     logName: "session.log",
     tools: [],
@@ -141,11 +141,10 @@
   }
 
   function drawTape(text) {
-    const stamps = [...text.matchAll(/^### \[([^\]]+)\]/gm)].map((m) => m[1]);
-    $("tape").innerHTML = stamps.map((s, i) => {
-      const short = s.slice(11, 19) || s;
-      return `<button type="button" data-i="${i}">${escapeHtml(short)}</button>`;
-    }).join("");
+    const stamps = [...text.matchAll(/^\[(\d{2}:\d{2})\]/gm)].map((m) => m[1]);
+    $("tape").innerHTML = stamps.map((s, i) => (
+      `<button type="button" data-i="${i}">${escapeHtml(s)}</button>`
+    )).join("");
   }
 
   async function saveNotes() {
@@ -237,8 +236,6 @@
       }
     }
     const view = $("log-view");
-    const follow = $("log-follow").checked;
-    const prevTop = view.scrollTop;
     if (reset || data.replace) {
       view.textContent = data.text || "";
       state.logOffset = data.offset || 0;
@@ -246,8 +243,7 @@
       view.textContent += data.text;
       state.logOffset = data.offset;
     }
-    if (follow) view.scrollTop = view.scrollHeight;
-    else view.scrollTop = prevTop;
+    view.scrollTop = view.scrollHeight;
   }
 
   async function refreshFiles() {
@@ -282,16 +278,32 @@
   }
 
   let infoCache = null;
+  let infoGroup = 0;
   async function renderInfo(filter) {
     if (!infoCache) infoCache = await api("/api/info");
     const q = (filter || $("info-search").value || "").toLowerCase();
     const target = infoCache.target || "$TARGET";
-    $("info-groups").innerHTML = infoCache.groups.map((g) => {
+    const nav = $("info-nav");
+    if (nav && !nav.dataset.ready) {
+      nav.innerHTML = infoCache.groups.map((g, i) => (
+        `<button type="button" data-info-g="${i}" class="${i === 0 ? "active" : ""}">${escapeHtml(g.group)}</button>`
+      )).join("");
+      nav.dataset.ready = "1";
+      nav.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-info-g]");
+        if (!btn) return;
+        infoGroup = Number(btn.dataset.infoG);
+        [...nav.children].forEach((b, i) => b.classList.toggle("active", i === infoGroup));
+        renderInfo();
+      });
+    }
+    const groups = infoCache.groups.filter((_, i) => i === infoGroup);
+    $("info-groups").innerHTML = groups.map((g) => {
       const tools = g.tools.filter((t) => {
         const blob = `${t.name} ${t.bin} ${t.blurb} ${t.syntax}`.toLowerCase();
         return !q || blob.includes(q);
       });
-      if (!tools.length) return "";
+      if (!tools.length) return `<p class="quiet">No tools in this group match the filter.</p>`;
       const cards = tools.map((t) => {
         const opts = (t.options || []).map((o) => `<li>${escapeHtml(o)}</li>`).join("");
         const ex = (t.examples || []).map((e) => `<code>${escapeHtml(e.replaceAll("$TARGET", target))}</code>`).join("");
@@ -362,7 +374,9 @@
     }).join("");
     $("tool-out").textContent = "";
     $("tool-cmd-preview").textContent = "";
+    $("tool-copy").value = "";
     $("tool-extra").value = "";
+    $("tool-notes").value = "no";
     state.cmdDirty = false;
     previewCommand();
   }
@@ -402,9 +416,11 @@
         }),
       });
       $("tool-cmd").value = data.command || "";
-      $("tool-cmd-preview").textContent = "";
+      $("tool-copy").value = data.copy_command || "";
+      $("tool-cmd-preview").textContent = data.output_file ? "saves " + data.output_file : "";
     } catch (err) {
       $("tool-cmd").value = "";
+      $("tool-copy").value = "";
       $("tool-cmd-preview").textContent = err.message;
     }
   }
@@ -419,6 +435,7 @@
       fields: toolFields(),
       command: $("tool-cmd").value,
       command_edited: state.cmdDirty,
+      include_notes: $("tool-notes").value === "yes",
     };
     $("tool-out").textContent = "";
     setToolRunning(true);
@@ -447,10 +464,14 @@
           if (!line) continue;
           let msg;
           try { msg = JSON.parse(line); } catch { continue; }
-          if (msg.type === "command") $("tool-cmd-preview").textContent = msg.command;
+          if (msg.type === "command") {
+            $("tool-cmd-preview").textContent = msg.command || "";
+            if (msg.copy_command) $("tool-copy").value = msg.copy_command;
+            if (msg.output_file) $("tool-cmd-preview").textContent = (msg.command || "") + "  →  " + msg.output_file;
+          }
           if (msg.type === "line") $("tool-out").textContent += msg.text;
           if (msg.type === "done") {
-            $("tool-out").textContent += `\n[exit ${msg.exit_code}] ${msg.output_file}\n${msg.summary || ""}`;
+            $("tool-out").textContent += `\n[exit ${msg.exit_code}] ${msg.output_file || ""}\n`;
             setToolRunning(false);
           }
           if (msg.type === "error") {
@@ -582,10 +603,10 @@
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "chip" + (cat === state.category ? " active" : "");
-      chip.textContent = cat;
+      chip.textContent = cat === "NONE" ? "None" : cat;
       chip.addEventListener("click", () => {
         state.category = cat;
-        document.querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c.textContent === cat));
+        document.querySelectorAll("#note-cats .chip").forEach((c) => c.classList.toggle("active", c === chip));
       });
       $("note-cats").appendChild(chip);
     });
@@ -679,11 +700,6 @@
       refreshLogs(true);
     });
     $("btn-log-refresh").addEventListener("click", () => refreshLogs(true));
-    $("log-view").addEventListener("scroll", () => {
-      const el = $("log-view");
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
-      $("log-follow").checked = atBottom;
-    });
     $("tool-nav").addEventListener("click", (e) => {
       const btn = e.target.closest("[data-g]");
       if (btn) showGroup(Number(btn.dataset.g));
@@ -707,8 +723,8 @@
       state.cmdDirty = true;
     });
     $("tool-form").addEventListener("input", (e) => {
-      if (e.target && e.target.id === "tool-cmd") return;
-      if (e.target && e.target.id === "tool-purpose") return;
+      const id = e.target && e.target.id;
+      if (id === "tool-cmd" || id === "tool-purpose" || id === "tool-copy" || id === "tool-notes") return;
       schedulePreview();
     });
     $("info-search").addEventListener("input", () => renderInfo());
@@ -824,7 +840,7 @@
     }, 8000);
     setInterval(() => {
       refreshState().catch(() => {});
-      if ($("tab-logs").classList.contains("active") && $("log-follow").checked) {
+      if ($("tab-logs").classList.contains("active")) {
         refreshLogs(false).catch(() => {});
       }
     }, 2500);

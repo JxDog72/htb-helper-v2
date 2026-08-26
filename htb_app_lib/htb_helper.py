@@ -270,6 +270,99 @@ def workspace_from_config(config):
     return root / f"{student_id}_{machine_name}"
 
 
+def workspace_slug(workspace):
+    return Path(workspace).name
+
+
+def _pick_path(new_path, old_path):
+    if new_path.exists() or not old_path.exists():
+        return new_path
+    return old_path
+
+
+def logs_dir(workspace):
+    workspace = Path(workspace)
+    return _pick_path(workspace / f"{workspace.name}_logs", workspace / "logs")
+
+
+def screenshots_dir(workspace):
+    workspace = Path(workspace)
+    return _pick_path(workspace / f"{workspace.name}_screenshots", workspace / "screenshots")
+
+
+def notes_file(workspace):
+    workspace = Path(workspace)
+    return _pick_path(workspace / f"{workspace.name}_notes.md", workspace / "notes" / "notes.md")
+
+
+def evidence_file(workspace):
+    workspace = Path(workspace)
+    return _pick_path(workspace / f"{workspace.name}_evidence.md", workspace / "notes" / "evidence.md")
+
+
+def report_dir(workspace):
+    return Path(workspace) / f"{Path(workspace).name}_report"
+
+
+def report_file(workspace):
+    workspace = Path(workspace)
+    return _pick_path(
+        report_dir(workspace) / f"{workspace.name}_report.md",
+        workspace / "notes" / "report_draft.md",
+    )
+
+
+def report_media_dir(workspace):
+    return report_dir(workspace) / "media"
+
+
+def files_given_dir(workspace):
+    return Path(workspace) / f"{Path(workspace).name}_files_given"
+
+
+def migrate_workspace_layout(workspace):
+    """Move legacy logs/notes/screenshots into studentID_machine_* names."""
+    workspace = Path(workspace)
+    slug = workspace.name
+    mapping = [
+        (workspace / "logs", workspace / f"{slug}_logs"),
+        (workspace / "screenshots", workspace / f"{slug}_screenshots"),
+        (workspace / "notes" / "notes.md", workspace / f"{slug}_notes.md"),
+        (workspace / "notes" / "evidence.md", workspace / f"{slug}_evidence.md"),
+        (workspace / "notes" / "report_draft.md", report_dir(workspace) / f"{slug}_report.md"),
+        (workspace / "notes" / "media", report_media_dir(workspace)),
+    ]
+    for old, new in mapping:
+        if old.exists() and not new.exists():
+            new.parent.mkdir(parents=True, exist_ok=True)
+            old.rename(new)
+
+
+def last_note_date(text):
+    dates = re.findall(r"(?m)^(\d{4}-\d{2}-\d{2})$", text or "")
+    return dates[-1] if dates else None
+
+
+def note_date_prefix(existing_text):
+    today = datetime.now().strftime("%Y-%m-%d")
+    if last_note_date(existing_text) == today:
+        return ""
+    return f"{today}\n"
+
+
+def note_clock():
+    return datetime.now().strftime("%H:%M")
+
+
+def format_workflow_stamp(existing_text, category=None):
+    prefix = note_date_prefix(existing_text)
+    clock = note_clock()
+    cat = str(category or "").strip().upper()
+    if cat in ("", "NONE", "SESSION"):
+        return f"{prefix}[{clock}]"
+    return f"{prefix}[{clock}] [{cat}]"
+
+
 # ============================================================
 # WORKSPACE AND MANIFEST
 # ============================================================
@@ -373,28 +466,33 @@ def update_milestone(workspace, milestone):
 
 def setup_workspace(config):
     workspace = workspace_from_config(config)
+    migrate_workspace_layout(workspace)
     for folder in (
-        workspace / "logs",
-        workspace / "screenshots",
-        workspace / "notes",
+        logs_dir(workspace),
+        screenshots_dir(workspace),
+        report_dir(workspace),
+        report_media_dir(workspace),
+        files_given_dir(workspace),
     ):
         folder.mkdir(parents=True, exist_ok=True)
 
-    notes_file = workspace / "notes" / "notes.md"
+    notes_path = notes_file(workspace)
     machine = config["machine_name"]
     lab_block = (
-        f"## Lab instructions — {machine}\n\n"
-        "Paste the HTB lab instructions here (scope, rules, and any details the box gives you).\n"
+        f"### Lab instructions\n\n"
+        "Paste the HTB lab instructions here (scope, rules, and any details the box gives you).\n\n"
+        "### Workflow\n"
     )
+    old_lab = f"## Lab instructions — {machine}\n\nPaste the HTB lab instructions here (scope, rules, and any details the box gives you).\n"
     old_timeline = (
         "## Research Timeline\n\n"
         "Automatic entries summarize observed tool output. The raw files in "
         "`logs/` remain the authoritative evidence. Student-entered purposes "
         "and manual notes preserve the student's own reasoning.\n"
     )
-    if not notes_file.exists():
-        notes_file.write_text(
-            "# HTB Enterprise Research Notes\n\n"
+    if not notes_path.exists():
+        notes_path.write_text(
+            f"# {machine}\n\n"
             f"Student ID: {config['student_id']}\n"
             f"Machine: {machine}\n"
             f"Target: {config['target_ip']}\n"
@@ -404,27 +502,49 @@ def setup_workspace(config):
             encoding="utf-8",
         )
     else:
-        current = notes_file.read_text(encoding="utf-8")
+        current = notes_path.read_text(encoding="utf-8")
         updated = current
+        if updated.startswith("# HTB Enterprise Research Notes"):
+            updated = f"# {machine}" + updated[len("# HTB Enterprise Research Notes"):]
         if old_timeline in updated:
             updated = updated.replace(old_timeline, lab_block, 1)
+        if old_lab in updated:
+            updated = updated.replace(old_lab, lab_block, 1)
+        if "### Workflow" not in updated and "### Lab instructions" in updated:
+            updated = updated.replace(
+                "Paste the HTB lab instructions here (scope, rules, and any details the box gives you).\n",
+                "Paste the HTB lab instructions here (scope, rules, and any details the box gives you).\n\n### Workflow\n",
+                1,
+            )
+        def _compact_session(match):
+            stamp = match.group(1) or ""
+            parts = stamp.split()
+            clock = parts[-1][:5] if parts else note_clock()
+            return f"[{clock}] Starting a terminal-logged shell for this engagement.\n"
+
         compact_session = re.compile(
-            r"(### \[[^\]]+\] \[SESSION\]\n"
-            r"- Summary: Starting a terminal-logged shell for this engagement\.\n)"
+            r"### \[([^\]]+)\] \[SESSION\]\n"
+            r"- Summary: Starting a terminal-logged shell for this engagement\.\n"
             r"(?:- Origin: [^\n]+\n)?"
             r"(?:- Tool: [^\n]+\n)?"
             r"(?:- Why / goal: [^\n]+\n(?:  [^\n]+\n)*)?"
             r"(?:- Raw evidence:\n(?:  - [^\n]+\n)*)?",
         )
-        updated = compact_session.sub(r"\1", updated)
+        updated = compact_session.sub(_compact_session, updated)
         if updated != current:
-            notes_file.write_text(updated, encoding="utf-8")
+            notes_path.write_text(updated, encoding="utf-8")
 
-    evidence_file = workspace / "notes" / "evidence.md"
-    if not evidence_file.exists():
-        evidence_file.write_text(
+    ev_path = evidence_file(workspace)
+    if not ev_path.exists():
+        ev_path.write_text(
             "# HTB Evidence Log\n\n"
             "Each evidence item points to an original artifact in the workspace.\n",
+            encoding="utf-8",
+        )
+    given = files_given_dir(workspace) / "README.txt"
+    if not given.exists():
+        given.write_text(
+            "Drop files the HTB lab gave you (VPN pack, wordlists, binaries) in this folder.\n",
             encoding="utf-8",
         )
 
@@ -507,30 +627,18 @@ def append_timeline_note(
             clean_evidence.append(cleaned)
     clean_evidence = unique_preserve(clean_evidence)
 
-    notes_file = workspace / "notes" / "notes.md"
-    with notes_file.open("a", encoding="utf-8") as handle:
-        handle.write(f"\n### [{note_time}] [{category}]\n")
-        write_note_field(handle, "Summary", summary)
-        if origin_write:
-            handle.write(f"- Origin: {origin}\n")
-        if tool:
-            handle.write(f"- Tool: {tool}\n")
-        if purpose:
-            write_note_field(handle, "Why / goal", purpose)
-        if command:
-            handle.write(f"- Command: `{command}`\n")
-        if exit_code is not None:
-            handle.write(f"- Exit code: `{exit_code}`\n")
-        if outcome:
-            write_note_field(handle, "What happened", outcome)
-        if clean_findings:
-            handle.write("- Observed findings:\n")
-            for finding in clean_findings:
-                handle.write(f"  - {finding}\n")
-        if clean_evidence:
-            handle.write("- Raw evidence:\n")
-            for item in clean_evidence:
-                handle.write(f"  - `{item}`\n")
+    path = notes_file(workspace)
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    stamp = format_workflow_stamp(existing, None if compact else category)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("\n")
+        if compact or not tool:
+            handle.write(f"{stamp} {summary}\n")
+        else:
+            handle.write(f"{stamp} {tool}\n")
+            if command:
+                handle.write(f"- Command: `{command}`\n")
+            handle.write("- Summary: \n")
 
     manifest_add(workspace, "notes", {
         "time": note_time,
@@ -1026,8 +1134,10 @@ def classify_outcome(returncode, interrupted=False):
 # COMMAND RECORDING AND STREAMING CAPTURE
 # ============================================================
 
-def save_command_record(workspace, command, description, purpose=None):
-    command_log = workspace / "logs" / "commands.log"
+def save_command_record(workspace, command, description, purpose=None, findings=None, output_file=None):
+    logs = logs_dir(workspace)
+    logs.mkdir(parents=True, exist_ok=True)
+    command_log = logs / "commands.log"
     command_text = shlex.join(command) if isinstance(command, list) else str(command)
     with command_log.open("a", encoding="utf-8") as handle:
         handle.write(f"\n[{human_timestamp()}]\n")
@@ -1035,6 +1145,14 @@ def save_command_record(workspace, command, description, purpose=None):
         if purpose:
             handle.write(f"Purpose: {purpose}\n")
         handle.write(f"Command: {command_text}\n")
+        if output_file:
+            handle.write(f"Raw output: {output_file}\n")
+        if findings:
+            handle.write("Observed findings:\n")
+            for finding in findings:
+                cleaned = str(finding).strip()
+                if cleaned:
+                    handle.write(f"  - {cleaned}\n")
 
 
 def run_streaming_command(command, raw_output_file):
@@ -1105,7 +1223,7 @@ def record_tool_run(
     tool = tool or identify_tool(command)
     tool_label = tool if tool != "generic" else Path(command[0]).name
     category = classify_tool_category(tool, command)
-    logs = workspace / "logs"
+    logs = logs_dir(workspace)
     logs.mkdir(parents=True, exist_ok=True)
 
     if output_file is None:
@@ -1233,7 +1351,8 @@ def record_tool_run(
 # ============================================================
 
 def get_next_session_log(workspace):
-    logs = workspace / "logs"
+    logs = logs_dir(workspace)
+    logs.mkdir(parents=True, exist_ok=True)
     first = logs / "session.log"
     if not first.exists():
         return first
@@ -1402,7 +1521,8 @@ def run_nmap(workspace, target, port=None, scan_args=None, description=None):
     )
     purpose = prompt_purpose(default_purpose)
 
-    logs = workspace / "logs"
+    logs = logs_dir(workspace)
+    logs.mkdir(parents=True, exist_ok=True)
     run_timestamp = timestamp_seconds()
     if port:
         output_prefix = logs / f"nmap_port_{port}_{run_timestamp}"
@@ -1602,8 +1722,8 @@ def get_next_evidence_id(evidence_file):
 
 
 def record_evidence(workspace):
-    evidence_file = workspace / "notes" / "evidence.md"
-    evidence_id = get_next_evidence_id(evidence_file)
+    ev_path = evidence_file(workspace)
+    evidence_id = get_next_evidence_id(ev_path)
 
     print("\n" + "=" * 60)
     print(f"RECORD E-{evidence_id:03d}")
@@ -1624,23 +1744,14 @@ def record_evidence(workspace):
         print("[-] Source must remain inside the workspace.")
         return
 
-    exists = source_path.exists()
-    status = "File found in workspace" if exists else "File not found — check the path"
-    size = source_path.stat().st_size if exists and source_path.is_file() else None
-    digest = sha256_file(source_path) if exists and source_path.is_file() else None
     evidence_time = human_timestamp()
 
-    with evidence_file.open("a", encoding="utf-8") as handle:
+    with ev_path.open("a", encoding="utf-8") as handle:
         handle.write(f"\n## E-{evidence_id:03d}\n")
         handle.write(f"- Time: {evidence_time}\n")
         handle.write(f"- Phase: {phase}\n")
         handle.write(f"- Description: {description}\n")
         handle.write(f"- Source: {source}\n")
-        handle.write(f"- Source status: {status}\n")
-        if size is not None:
-            handle.write(f"- Source size: {size:,} bytes\n")
-        if digest:
-            handle.write(f"- SHA-256: {digest}\n")
 
     manifest_add(workspace, "evidence", {
         "id": f"E-{evidence_id:03d}",
@@ -1648,18 +1759,14 @@ def record_evidence(workspace):
         "phase": phase,
         "description": description,
         "source": source,
-        "status": status,
-        "size": size,
-        "sha256": digest,
     })
 
     append_timeline_note(
         workspace,
-        "EVIDENCE",
-        f"Recorded evidence E-{evidence_id:03d}: {description}",
+        "NONE",
+        f"E-{evidence_id:03d}: {description}",
         origin="student",
-        outcome=f"Source status: {status}",
-        evidence=[source],
+        compact=True,
     )
     print(f"[+] Evidence E-{evidence_id:03d} recorded.")
 
@@ -1677,7 +1784,7 @@ def find_screenshot_command():
 
 def infer_milestones_from_screenshots(workspace):
     """Treat files like User-flag.png as the user-flag milestone even if not captured via the menu."""
-    folder = workspace / "screenshots"
+    folder = screenshots_dir(workspace)
     names = []
     if folder.is_dir():
         for path in folder.iterdir():
@@ -1742,7 +1849,7 @@ def ask_yes_no(prompt, default=False):
 
 def capture_screenshot(workspace, milestone, milestone_name, description_raw):
     """Capture and register a screenshot for a known milestone."""
-    screenshots = workspace / "screenshots"
+    screenshots = screenshots_dir(workspace)
     screenshots.mkdir(parents=True, exist_ok=True)
 
     command_name = find_screenshot_command()
@@ -1895,18 +2002,18 @@ def record_screenshot(workspace):
 
 def show_recent_notes(workspace, count=8):
     """Display the most recent timeline entries for quick verification."""
-    notes_file = workspace / "notes" / "notes.md"
-    if not notes_file.exists():
-        print("[-] notes.md does not exist.")
+    path = notes_file(workspace)
+    if not path.exists():
+        print("[-] notes file does not exist.")
         return
 
     try:
-        content = notes_file.read_text(encoding="utf-8", errors="replace")
+        content = path.read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
-        print(f"[-] Could not read notes.md: {exc}")
+        print(f"[-] Could not read notes: {exc}")
         return
 
-    starts = [m.start() for m in re.finditer(r"(?m)^### \[", content)]
+    starts = [m.start() for m in re.finditer(r"(?m)^\[\d{2}:\d{2}\]", content)]
     print("\n" + "=" * 60)
     print("RECENT RESEARCH NOTES")
     print("=" * 60)
@@ -1997,22 +2104,22 @@ def list_files(workspace):
 
 def research_statistics(workspace):
     manifest = load_manifest(workspace) or {}
-    logs = workspace / "logs"
-    screenshots = workspace / "screenshots"
-    notes_file = workspace / "notes" / "notes.md"
-    evidence_file = workspace / "notes" / "evidence.md"
+    logs = logs_dir(workspace)
+    screenshots = screenshots_dir(workspace)
+    notes_path = notes_file(workspace)
+    ev_path = evidence_file(workspace)
 
     note_count = 0
-    if notes_file.exists():
+    if notes_path.exists():
         try:
-            note_count = len(re.findall(r"^### \[", notes_file.read_text(encoding="utf-8"), re.M))
+            note_count = len(re.findall(r"^\[\d{2}:\d{2}\]", notes_path.read_text(encoding="utf-8"), re.M))
         except OSError:
             pass
 
     evidence_count = 0
-    if evidence_file.exists():
+    if ev_path.exists():
         try:
-            evidence_count = len(re.findall(r"^## E-\d+", evidence_file.read_text(encoding="utf-8"), re.M))
+            evidence_count = len(re.findall(r"^## E-\d+", ev_path.read_text(encoding="utf-8"), re.M))
         except OSError:
             pass
 
@@ -2053,17 +2160,21 @@ def validate_submission(workspace):
     failures = []
     warnings = []
 
-    for directory in ("logs", "screenshots", "notes"):
-        path = workspace / directory
+    for label, path in (
+        ("logs", logs_dir(workspace)),
+        ("screenshots", screenshots_dir(workspace)),
+        ("report", report_dir(workspace)),
+        ("files_given", files_given_dir(workspace)),
+    ):
         if path.is_dir():
-            print(f"[PASS] {directory}/ exists")
+            print(f"[PASS] {path.name}/ exists")
         else:
-            print(f"[FAIL] {directory}/ missing")
-            failures.append(f"Missing directory: {directory}")
+            print(f"[FAIL] {path.name}/ missing")
+            failures.append(f"Missing directory: {path.name}")
 
     required_files = (
-        workspace / "notes" / "notes.md",
-        workspace / "notes" / "evidence.md",
+        notes_file(workspace),
+        evidence_file(workspace),
         workspace / "metadata.json",
         workspace / "research_manifest.json",
     )
@@ -2074,7 +2185,7 @@ def validate_submission(workspace):
             print(f"[FAIL] {relative_path(workspace, path)} missing")
             failures.append(f"Missing file: {relative_path(workspace, path)}")
 
-    session_logs = list((workspace / "logs").glob("session*.log"))
+    session_logs = list(logs_dir(workspace).glob("session*.log"))
     if not session_logs:
         print("[WARN] No session logs found")
         warnings.append("No session logs found. The study requires continuous terminal logging.")
@@ -2134,7 +2245,7 @@ def validate_submission(workspace):
         for milestone, complete in milestones.items():
             print(f"  [{'PASS' if complete else 'WARN'}] {milestone_label(milestone)}")
 
-    screenshot_files = list((workspace / "screenshots").glob("*"))
+    screenshot_files = list(screenshots_dir(workspace).glob("*"))
     screenshot_files = [p for p in screenshot_files if p.is_file() and p.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".gif"}]
     if screenshot_files:
         print(f"[PASS] {len(screenshot_files)} screenshot(s) found")
@@ -2150,8 +2261,6 @@ def validate_submission(workspace):
         print("\n[!] Validation completed with warnings.")
         for warning in warnings:
             print(f"    - {warning}")
-    else:
-        print("\n[+] Validation passed without warnings.")
     return not failures
 
 

@@ -240,7 +240,7 @@ def notes_path():
     ws = STATE["workspace"]
     if not ws:
         return None
-    return ws / "notes" / "notes.md"
+    return engine.notes_file(ws)
 
 
 def json_bytes(payload, status=200):
@@ -267,12 +267,14 @@ def append_student_note(category: str, body: str):
     ws = STATE["workspace"]
     if not ws:
         raise RuntimeError("Workspace is not configured yet.")
-    category = (category or "OTHER").strip().upper()
+    category = (category or "NONE").strip().upper()
     body = (body or "").rstrip()
     if not body:
         raise RuntimeError("Note body is empty.")
-    block = f"\n### [{human_ts()}] [{category}]\n\n{body}\n"
     path = notes_path()
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    stamp = engine.format_workflow_stamp(existing, category)
+    block = f"\n{stamp} {body}\n"
     with STATE["notes_lock"]:
         with path.open("a", encoding="utf-8") as handle:
             handle.write(block)
@@ -286,8 +288,11 @@ def append_student_note(category: str, body: str):
 
 
 def stamp_heading(category: str):
-    category = (category or "OTHER").strip().upper()
-    return f"\n### [{human_ts()}] [{category}]\n\n"
+    ws = STATE["workspace"]
+    path = notes_path()
+    existing = path.read_text(encoding="utf-8") if path and path.exists() else ""
+    stamp = engine.format_workflow_stamp(existing, category)
+    return f"\n{stamp} "
 
 
 def preflight_payload():
@@ -338,15 +343,16 @@ def stats_payload():
     ws = STATE["workspace"]
     if not ws:
         return {}
-    logs = ws / "logs"
-    shots = ws / "screenshots"
+    logs = engine.logs_dir(ws)
+    shots = engine.screenshots_dir(ws)
     notes = read_notes()
-    evidence = (ws / "notes" / "evidence.md").read_text(encoding="utf-8", errors="replace") if (ws / "notes" / "evidence.md").exists() else ""
+    ev_path = engine.evidence_file(ws)
+    evidence = ev_path.read_text(encoding="utf-8", errors="replace") if ev_path.exists() else ""
     manifest = engine.load_manifest(ws) or {}
     return {
         "session_logs": len(list(logs.glob("session*.log"))),
         "tool_runs": len(manifest.get("tool_runs") or []),
-        "timeline_notes": len(re.findall(r"^### \[", notes, re.M)),
+        "timeline_notes": len(re.findall(r"^\[\d{2}:\d{2}\]", notes, re.M)),
         "evidence": len(re.findall(r"^## E-\d+", evidence, re.M)),
         "screenshots": len(list(shots.glob("*.png"))),
         "milestones": manifest.get("milestones") or {},
@@ -374,7 +380,7 @@ def log_files():
     ws = STATE["workspace"]
     if not ws:
         return []
-    logs = ws / "logs"
+    logs = engine.logs_dir(ws)
     names = []
     for path in sorted(logs.glob("*"), key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True):
         if path.is_file():
@@ -386,8 +392,8 @@ def read_log(name: str, offset: int = 0):
     ws = STATE["workspace"]
     if not ws:
         return {"text": "", "offset": 0, "name": name}
-    path = (ws / "logs" / name).resolve()
-    path.relative_to((ws / "logs").resolve())
+    path = (engine.logs_dir(ws) / name).resolve()
+    path.relative_to(engine.logs_dir(ws).resolve())
     if not path.is_file():
         return {"text": "", "offset": 0, "name": name}
     data = path.read_bytes()
@@ -408,7 +414,7 @@ def capture_screenshot(milestone, description):
     ws = STATE["workspace"]
     if not ws:
         raise RuntimeError("Workspace is not configured yet.")
-    screenshots = ws / "screenshots"
+    screenshots = engine.screenshots_dir(ws)
     screenshots.mkdir(parents=True, exist_ok=True)
     description = engine.safe_filename(description) or "screenshot"
     dest = screenshots / f"{engine.timestamp_seconds()}_{engine.safe_filename(milestone)}_{description}.png"
@@ -454,9 +460,9 @@ def capture_screenshot(milestone, description):
     })
     engine.append_timeline_note(
         ws,
-        "EVIDENCE",
-        f"Captured screenshot: {description}",
-        evidence=[engine.relative_path(ws, dest)],
+        "NONE",
+        f"Screenshot: {description}",
+        compact=True,
         metadata={"milestone": milestone},
     )
     return engine.relative_path(ws, dest)
@@ -552,7 +558,8 @@ def build_command(tool, fields, extra, config):
     if kind in ("nmap", "nmap-port"):
         ws = STATE["workspace"]
         stamp = engine.timestamp_seconds()
-        logs = ws / "logs"
+        logs = engine.logs_dir(ws)
+        logs.mkdir(parents=True, exist_ok=True)
         if kind == "nmap-port" and port is None:
             raise RuntimeError("Set a port for this scan (lab assigned port, or another port you found).")
         if port:
@@ -676,7 +683,7 @@ def record_gui_tool(tool, command, purpose, description):
     bin_name = command[0] if command else "command"
     tool_name = Path(bin_name).name
     identified = engine.identify_tool(command)
-    logs = ws / "logs"
+    logs = engine.logs_dir(ws)
     logs.mkdir(parents=True, exist_ok=True)
     output_file = logs / f"{engine.safe_filename(tool_name)}_{engine.timestamp_seconds()}.txt"
     return engine.record_tool_run(
@@ -745,7 +752,7 @@ def run_tool_streaming(command, output_file, send_line):
     }
 
 
-def finish_tool_run(tool, command, purpose, description, result, output_file):
+def finish_tool_run(tool, command, purpose, description, result, output_file, include_notes=False):
     ws = STATE["workspace"]
     identified = engine.identify_tool(command)
     tool_label = identified if identified != "generic" else Path(command[0]).name
@@ -755,20 +762,23 @@ def finish_tool_run(tool, command, purpose, description, result, output_file):
         findings.append("Parser used the first part of a large capture; the raw file is complete.")
     outcome = engine.classify_outcome(result["returncode"], result["interrupted"])
     rel = engine.relative_path(ws, output_file)
-    engine.save_command_record(ws, command, description, purpose)
-    engine.append_timeline_note(
+    engine.save_command_record(
         ws,
-        "DEAD END" if result["interrupted"] else category,
-        summary,
-        tool=tool_label,
-        command=shlex.join(command),
-        purpose=purpose,
-        exit_code=result["returncode"],
-        outcome=outcome,
+        command,
+        description,
+        purpose,
         findings=findings,
-        evidence=[rel],
-        metadata={**metadata, "event": "attempt_result"},
+        output_file=rel,
     )
+    if include_notes:
+        engine.append_timeline_note(
+            ws,
+            "DEAD END" if result["interrupted"] else category,
+            summary,
+            tool=tool_label,
+            command=format_command(command),
+            metadata={**metadata, "event": "attempt_result"},
+        )
     artifact = engine.file_metadata(ws, output_file)
     run_record = {
         "time": human_ts(),
@@ -789,7 +799,7 @@ def finish_tool_run(tool, command, purpose, description, result, output_file):
 
 def evidence_suggestion_lines(workspace):
     """Short bullets from evidence.md — no headings, for the student to rewrite."""
-    path = workspace / "notes" / "evidence.md"
+    path = engine.evidence_file(workspace)
     if not path.exists():
         return []
     try:
@@ -828,7 +838,7 @@ def report_path():
     ws = STATE["workspace"]
     if not ws:
         return None
-    return ws / "notes" / "report_draft.md"
+    return engine.report_file(ws)
 
 
 def write_report(text: str):
@@ -853,7 +863,7 @@ def save_pasted_image(data_b64: str, mime: str = ""):
         ext = "gif"
     elif "webp" in mime:
         ext = "webp"
-    folder = ws / "notes" / "media"
+    folder = engine.report_media_dir(ws)
     folder.mkdir(parents=True, exist_ok=True)
     name = f"paste_{engine.timestamp_seconds()}.{ext}"
     dest = folder / name
@@ -921,7 +931,8 @@ def build_report():
         "",
     ])
     text = "\n".join(lines) + "\n"
-    dest = ws / "notes" / "report_draft.md"
+    dest = engine.report_file(ws)
+    dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(text, encoding="utf-8")
     return text
 
@@ -1028,8 +1039,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/evidence":
                 ws = STATE["workspace"]
                 text = ""
-                if ws and (ws / "notes" / "evidence.md").exists():
-                    text = (ws / "notes" / "evidence.md").read_text(encoding="utf-8", errors="replace")
+                ev_path = engine.evidence_file(ws) if ws else None
+                if ev_path and ev_path.exists():
+                    text = ev_path.read_text(encoding="utf-8", errors="replace")
                 self._json({"text": text})
                 return
             if path == "/api/files":
@@ -1161,12 +1173,12 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/notes/append":
-                block = append_student_note(data.get("category") or "OTHER", data.get("body") or "")
+                block = append_student_note(data.get("category") or "NONE", data.get("body") or "")
                 self._json({"ok": True, "block": block, "text": read_notes()})
                 return
 
             if path == "/api/notes/stamp":
-                heading = stamp_heading(data.get("category") or "OTHER")
+                heading = stamp_heading(data.get("category") or "NONE")
                 self._json({"ok": True, "heading": heading})
                 return
 
@@ -1174,8 +1186,8 @@ class Handler(BaseHTTPRequestHandler):
                 ws = STATE["workspace"]
                 if not ws:
                     raise RuntimeError("Workspace is not configured yet.")
-                evidence_file = ws / "notes" / "evidence.md"
-                evidence_id = engine.get_next_evidence_id(evidence_file)
+                ev_path = engine.evidence_file(ws)
+                evidence_id = engine.get_next_evidence_id(ev_path)
                 phase = str(data.get("phase") or "").strip()
                 description = str(data.get("description") or "").strip()
                 source = str(data.get("source") or "").strip()
@@ -1184,50 +1196,32 @@ class Handler(BaseHTTPRequestHandler):
                     raise RuntimeError("Phase and description are required.")
                 if source_na or source.upper() in ("N/A", "NA"):
                     source = "N/A"
-                    status = "N/A"
-                    size = None
-                    digest = None
                 else:
                     if not source:
                         raise RuntimeError("Source file is required, or check Source N/A.")
                     source_path = (ws / source).resolve()
                     source_path.relative_to(ws.resolve())
-                    exists = source_path.exists()
-                    status = (
-                        "File found in workspace"
-                        if exists
-                        else "File not found — check the path"
-                    )
-                    size = source_path.stat().st_size if exists and source_path.is_file() else None
-                    digest = engine.sha256_file(source_path) if exists and source_path.is_file() else None
-                with evidence_file.open("a", encoding="utf-8") as handle:
+                with ev_path.open("a", encoding="utf-8") as handle:
                     handle.write(f"\n## E-{evidence_id:03d}\n")
                     handle.write(f"- Time: {human_ts()}\n")
                     handle.write(f"- Phase: {phase}\n")
                     handle.write(f"- Description: {description}\n")
                     handle.write(f"- Source: {source}\n")
-                    handle.write(f"- Source status: {status}\n")
-                    if size is not None:
-                        handle.write(f"- Source size: {size:,} bytes\n")
-                    if digest:
-                        handle.write(f"- SHA-256: {digest}\n")
                 engine.manifest_add(ws, "evidence", {
                     "id": f"E-{evidence_id:03d}",
                     "time": human_ts(),
                     "phase": phase,
                     "description": description,
                     "source": source,
-                    "status": status,
-                    "sha256": digest,
                 })
                 engine.append_timeline_note(
                     ws,
-                    "EVIDENCE",
-                    f"Recorded evidence E-{evidence_id:03d}: {description}",
+                    "NONE",
+                    f"E-{evidence_id:03d}: {description}",
                     origin="student",
-                    evidence=[source],
+                    compact=True,
                 )
-                text = evidence_file.read_text(encoding="utf-8")
+                text = ev_path.read_text(encoding="utf-8")
                 self._json({"ok": True, "id": f"E-{evidence_id:03d}", "text": text})
                 return
 
@@ -1304,7 +1298,18 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/tools/preview":
                 tool, fields = collect_tool_fields(data)
                 command = build_command(tool, fields, data.get("extra") or "", STATE["config"])
-                self._json({"command": format_command(command)})
+                cmd = format_command(command)
+                ws = STATE["workspace"]
+                logs = engine.logs_dir(ws)
+                logs.mkdir(parents=True, exist_ok=True)
+                label = tool.get("bin") or tool.get("id") or command[0]
+                out = logs / f"{engine.safe_filename(label)}_{engine.timestamp_seconds()}.txt"
+                rel = engine.relative_path(ws, out)
+                self._json({
+                    "command": cmd,
+                    "output_file": rel,
+                    "copy_command": f'{cmd} | tee "{rel}"',
+                })
                 return
 
             if path == "/api/tools/stop":
@@ -1345,30 +1350,30 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.flush()
 
         try:
-            emit({"type": "command", "command": format_command(command)})
+            cmd = format_command(command)
             ws = STATE["workspace"]
             identified = engine.identify_tool(command)
             tool_label = identified if identified != "generic" else Path(command[0]).name
-            logs = ws / "logs"
+            logs = engine.logs_dir(ws)
+            logs.mkdir(parents=True, exist_ok=True)
             output_file = logs / f"{engine.safe_filename(tool_label)}_{engine.timestamp_seconds()}.txt"
-            engine.append_timeline_note(
-                ws,
-                engine.classify_tool_category(identified, command),
-                f"Starting {description}.",
-                origin="automatic",
-                tool=tool_label,
-                command=format_command(command),
-                purpose=purpose,
-                outcome="Command is about to run.",
-                metadata={"event": "attempt_started"},
-            )
+            rel = engine.relative_path(ws, output_file)
+            emit({
+                "type": "command",
+                "command": cmd,
+                "output_file": rel,
+                "copy_command": f'{cmd} | tee "{rel}"',
+            })
             result = run_tool_streaming(command, output_file, lambda line: emit({"type": "line", "text": line}))
-            record = finish_tool_run(tool, command, purpose, description, result, output_file)
+            include_notes = bool(data.get("include_notes"))
+            record = finish_tool_run(
+                tool, command, purpose, description, result, output_file,
+                include_notes=include_notes,
+            )
             emit({
                 "type": "done",
                 "exit_code": result["returncode"],
-                "output_file": engine.relative_path(ws, output_file),
-                "summary": record["summary"],
+                "output_file": rel,
             })
         except FileNotFoundError:
             emit({"type": "error", "error": f"Command not found: {command[0]}"})

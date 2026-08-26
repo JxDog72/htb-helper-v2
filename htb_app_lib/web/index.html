@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=11" />
+  <link rel="stylesheet" href="/app.css?v=13" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c9843a'/></svg>" />
 </head>
 <body>
@@ -89,7 +89,7 @@
             <button type="button" class="chip" data-notes-view="nice">Nice view</button>
           </div>
           <div class="toolbar-right">
-            <button type="button" class="btn ghost" id="btn-stamp" title="Ctrl+N">Stamp entry</button>
+            <button type="button" class="btn ghost" id="btn-stamp" title="Ctrl+N">Stamp time</button>
             <button type="button" class="btn ghost" id="btn-heading">##</button>
             <button type="button" class="btn ghost" id="btn-code">```</button>
             <button type="button" class="btn ghost" id="btn-list">• list</button>
@@ -97,7 +97,7 @@
         </div>
         <div class="quick-add">
           <label class="quiet">Quick add — markdown is allowed (headings, lists, fenced code)</label>
-          <textarea id="quick-body" rows="4" placeholder="## What I tried&#10;&#10;- bullet&#10;&#10;```python&#10;print('this actually works now')&#10;```"></textarea>
+          <textarea id="quick-body" rows="4" placeholder="What I tried&#10;&#10;- bullet&#10;&#10;```python&#10;print('this actually works now')&#10;```"></textarea>
           <div class="row">
             <button type="button" class="btn copper" id="btn-append">Append to notes.md</button>
             <span class="quiet">Ctrl+Enter appends · full file below stays one continuous .md</span>
@@ -116,8 +116,7 @@
             <select id="log-select"></select>
           </label>
           <button type="button" class="btn ghost" id="btn-log-refresh">Refresh</button>
-          <label class="check"><input type="checkbox" id="log-follow" checked /> Follow</label>
-          <span class="quiet">Each ./htb start uses the next free file: session.log, session2.log, …</span>
+          <span class="quiet">Live tail. Each ./htb start uses the next free file: session.log, session2.log, …</span>
         </div>
         <pre id="log-view" class="console"></pre>
       </section>
@@ -127,7 +126,7 @@
           <aside class="tool-nav" id="tool-nav"></aside>
           <div class="tool-panel">
             <h2 id="tool-group-title">Tools</h2>
-            <p class="lede" id="tool-group-blurb">Pick a category. Each run asks why, captures raw output, and writes a timeline note.</p>
+            <p class="lede" id="tool-group-blurb">Pick a category. Each run asks why and captures raw output to a .txt. Notes are optional.</p>
             <div id="tool-list"></div>
             <form id="tool-form" class="tool-form hidden">
               <h3 id="tool-name"></h3>
@@ -152,7 +151,16 @@
               <label>Command
                 <textarea id="tool-cmd" rows="2" spellcheck="false" placeholder="Loads from the selected tool. Edit before you run."></textarea>
               </label>
-              <p class="quiet">This is the command that will run. Change fields or extra args to rebuild it, or edit this line directly.</p>
+              <p class="quiet">This is the command the helper will run. Copy the tee line below if you want the same .txt save in your own terminal.</p>
+              <label>Copy for your own terminal (saves .txt)
+                <textarea id="tool-copy" rows="2" spellcheck="false" readonly></textarea>
+              </label>
+              <label>Include tool use in notes.md
+                <select id="tool-notes">
+                  <option value="no" selected>No</option>
+                  <option value="yes">Include tool use in notes.md</option>
+                </select>
+              </label>
               <div class="row wrap">
                 <button type="submit" class="btn copper" id="btn-tool-run">Run and capture</button>
                 <button type="button" class="btn ghost" id="btn-tool-stop" disabled>Stop tool</button>
@@ -170,13 +178,16 @@
           <input id="info-search" type="search" placeholder="Filter tools (nmap, ffuf, nxc…)" />
           <span class="quiet">Cheat sheet only — running a tool is on the Tools tab. Syntax uses the configured target as $TARGET.</span>
         </div>
-        <div id="info-groups" class="info-groups"></div>
+        <div class="tools-layout">
+          <aside class="tool-nav" id="info-nav"></aside>
+          <div id="info-groups" class="info-groups"></div>
+        </div>
       </section>
 
       <section id="tab-evidence" class="tab">
         <form id="evidence-form" class="stack narrow">
           <h2>Record evidence</h2>
-          <p class="lede">Points at a file already in the workspace (scan output, screenshot, session log). <strong>E-ID</strong> is the next number (E-001, E-002, …) so you can cite it. <strong>Source status</strong> only means “does that file exist on disk?” — it is not a judgment that the finding is correct. <strong>SHA-256</strong> is a fingerprint of the file in case it is changed later; you do not need it in the write-up.</p>
+          <p class="lede">Points at a file already in the workspace (scan output, screenshot, session log). <strong>E-ID</strong> is the next number (E-001, E-002, …) so you can cite it in the write-up.</p>
           <label>Phase / category<input name="phase" required placeholder="Recon, Finding, Foothold" list="phase-names" /></label>
           <datalist id="phase-names">
             <option value="Recon"></option>
@@ -210,7 +221,7 @@
           <button type="button" class="btn copper" id="btn-report">Insert / reset template</button>
           <button type="button" class="btn ghost" id="btn-save-report">Save report</button>
           <span id="report-save-state" class="quiet">saved</span>
-          <span class="quiet">Paste images with Ctrl+V. File: notes/report_draft.md</span>
+          <span class="quiet">Paste images with Ctrl+V. Saved as studentID_machine_report.md in the report folder.</span>
         </div>
         <div class="notes-split report-split mode-both" id="report-split">
           <textarea id="report-editor" spellcheck="true" aria-label="report_draft.md" placeholder="# HTB Challenge:&#10;&#10;## Executive Summary&#10;"></textarea>
@@ -257,10 +268,14 @@
             <button type="button" class="btn ghost" id="btn-validate">Run validation</button>
           </div>
           <div>
-            <h2>Backup</h2>
-            <p class="lede">ZIP of the current machine workspace, next to the machines folder.</p>
-            <button type="button" class="btn copper" id="btn-zip">Create ZIP</button>
+            <h2>Export to your host (Pwnbox)</h2>
+            <p class="lede">Creates a ZIP of this machine folder next to <code>machines/</code>. On HTB Pwnbox, download that ZIP to your host through the Pwnbox file manager (right-click the zip → Download), or copy it over VPN with <code>scp</code>.</p>
+            <button type="button" class="btn copper" id="btn-zip">Create ZIP for host</button>
             <p id="zip-out" class="quiet"></p>
+            <h3>Encrypt and send to yourself</h3>
+            <p class="lede">After the ZIP exists, encrypt it with a password you know, then send the encrypted file to yourself with <a href="https://wormhole.app" target="_blank" rel="noopener">wormhole.app</a> (open that site on Pwnbox, drop the zip, open the link on your host).</p>
+            <pre class="syntax">zip -e studentID_machine_encrypted.zip studentID_machine_*.zip
+# then open https://wormhole.app and upload the encrypted zip</pre>
           </div>
           <div>
             <h2>Hotkeys</h2>
@@ -331,7 +346,7 @@ git pull
           <p>Run <code>./htb</code> again. It does <strong>not</strong> overwrite the old log. You get <code>session.log</code>, then <code>session2.log</code>, <code>session3.log</code>, and so on.</p>
 
           <h3>Where is my work?</h3>
-          <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> — <code>logs/</code>, <code>notes/notes.md</code>, <code>notes/evidence.md</code>, <code>screenshots/</code>. Notes auto-save. Status → ZIP for a backup.</p>
+          <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>&lt;slug&gt;_logs/</code>, <code>&lt;slug&gt;_screenshots/</code>, <code>&lt;slug&gt;_notes.md</code>, <code>&lt;slug&gt;_report/</code> (written report + media), and <code>&lt;slug&gt;_files_given/</code>. Notes auto-save. Status → ZIP for a backup you can download off Pwnbox.</p>
 
           <h3>Tools IP / port stuck?</h3>
           <p>Lab identity is only the default. On the Tools form, change <strong>Target IP</strong> and <strong>Port</strong> for that run (another host, a new port, etc.). The <strong>Command</strong> box is the line that actually runs — edit it, or use Extra arguments and Reset command. <strong>Stop tool</strong> kills the current helper-launched scan (nmap, ping, gobuster, …) without closing the GUI.</p>
@@ -339,12 +354,11 @@ git pull
           <h3>Nmap files</h3>
           <p>Each helper nmap run keeps a streamed <code>.txt</code> and nmap’s own <code>.nmap</code>. No xml/gnmap.</p>
 
-          <h3>E-ID and SHA-256</h3>
+          <h3>E-ID</h3>
           <p><strong>E-001</strong> is just the next evidence number so you can cite it in the report (like a footnote ID).</p>
-          <p><strong>SHA-256</strong> is a checksum fingerprint of the evidence <em>file</em> (the nmap output, screenshot, etc.). If someone later swaps or edits that file, the hash will not match. You do not need to paste the hash into the written report unless the study asks for it — it is stored in <code>evidence.md</code> automatically.</p>
 
           <h3>Report tab</h3>
-          <p>Use <strong>Display</strong>: 1 Write (editor only, good on small laptops), 2 View (formatted preview), 3 Both (split). Auto-saves to <code>notes/report_draft.md</code>. Paste images with Ctrl+V.</p>
+          <p>Use <strong>Display</strong>: 1 Write (editor only, good on small laptops), 2 View (formatted preview), 3 Both (split). Auto-saves to <code>studentID_machine_report.md</code> in the report folder. Paste images with Ctrl+V (they go in that folder’s <code>media/</code>).</p>
 
           <h3>Validation [WARN] user_flag</h3>
           <p>That is <em>not</em> asking you to type <code>user_flag</code> in notes. It only means you have not recorded a <strong>user-flag screenshot</strong> yet (Status → or Evidence / screenshot). WARN here is a reminder, not a failure. Same for root_admin_flag and other screenshot milestones.</p>
@@ -355,12 +369,12 @@ git pull
           <h3>Notes: Split / Write / Nice view</h3>
           <p><strong>Split</strong> is raw markdown on the left and preview on the right. <strong>Write</strong> is the editor only. <strong>Nice view</strong> is the formatted preview (read-only) after you finish writing. Switch back to Write to edit again.</p>
 
-          <h3>Logs jump to the bottom</h3>
-          <p>Uncheck <strong>Follow</strong>, or scroll up — follow turns off until you scroll to the bottom again.</p>
+          <h3>Logs</h3>
+          <p>The Logs tab always tails the live session. Each <code>./htb</code> start gets a new file: <code>session.log</code>, then <code>session2.log</code>, and so on.</p>
         </article>
       </section>
     </main>
   </div>
-  <script src="/app.js?v=12"></script>
+  <script src="/app.js?v=13"></script>
 </body>
 </html>

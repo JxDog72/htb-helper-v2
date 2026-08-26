@@ -63,11 +63,12 @@ command `~/htb-helper-v2/htb` → `Ctrl+Alt+H`.
 Per machine, under `machines/<student>_<machine>/`:
 
 ```
-logs/            session.log + captured tool output
-screenshots/
-notes/notes.md   one continuous Markdown file, timestamped entries
-notes/evidence.md
-notes/report_draft.md
+<student>_<machine>_logs/            session.log + captured tool output
+<student>_<machine>_screenshots/
+<student>_<machine>_notes.md         workflow notes (military timestamps)
+<student>_<machine>_evidence.md
+<student>_<machine>_report/          written report + media/
+<student>_<machine>_files_given/     files the lab handed you
 metadata.json
 research_manifest.json
 ```
@@ -76,11 +77,11 @@ GUI sections:
 
 | Tab | Job |
 |-----|-----|
-| Notes | Full `.md` editor + live preview. Opens with lab identity plus a **Lab instructions** heading to paste the HTB brief. Stamp `### [time] [CATEGORY]`. Quick-add supports headings, bullets, fenced code. |
-| Logs | Tail `session.log` and other files in `logs/` |
-| Tools | Numbered **categories** (Network, Web/Fuzzing, DNS/OSINT, SMB/AD, HTTP, Custom) with sub-tools. Edit the command before run; **Stop tool** kills the current scan. |
-| Tool Info | Cheat sheet: one-line description, syntax, flags, examples |
-| Evidence / Files / Report / Status | Same study workflow as v3, plus ZIP + validate |
+| Notes | Full `.md` editor + live preview. `# Machine` title, `### Lab instructions`, `### Workflow`. Stamp `[HH:MM]` (category optional). |
+| Logs | Live tail of `session.log` (new file each `./htb` start) |
+| Tools | Categories with sub-tools. Edit the command; copy a `tee` line for your own terminal; **Stop tool**; notes save is optional (default No). |
+| Tool Info | Cheat sheet with category tabs, CyberChef, official CVE links, ICS/Modbus |
+| Evidence / Files / Report / Status | Evidence without hashes. Status ZIP is for getting the folder off Pwnbox (optional encrypt + [wormhole.app](https://wormhole.app)). |
 
 Notes auto-save. `Ctrl+S` save, `Ctrl+N` stamp, `Ctrl+1`–`8` tabs,
 `Ctrl+Enter` appends the quick-add box.

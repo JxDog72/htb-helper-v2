@@ -40,10 +40,10 @@ done for the session. If it dies, run `./htb` again; it creates
 
 ## 4. Notes
 
-Use the **Notes** tab. Markdown works:
+Use the **Notes** tab. Markdown works (fences need a closing ` ``` `):
 
-```markdown
-## Apache on 80
+````markdown
+Apache on 80
 
 - directory listing on /backup
 - login form on /admin
@@ -51,27 +51,29 @@ Use the **Notes** tab. Markdown works:
 ```python
 print("this is a real fence")
 ```
-```
+````
 
-Stamp a heading (`Ctrl+N`) whenever you change approach. Record dead
-ends.
+`Ctrl+N` stamps `[HH:MM]`. Category chips default to None. Only the machine
+title uses `#`; lab instructions and Workflow use `###`.
 
 ## 5. Tools
 
 **Tools** tab is categorized (1 Network, 2 Web/Fuzzing, …). Each run
-asks *why*, streams output, writes a raw file under `logs/`, and appends
-a timeline note.
+asks *why*, streams output, and writes a raw `.txt` under
+`<student>_<machine>_logs/`. Including that run in notes.md is a dropdown
+(default **No**). Copy the `tee` line if you want the same save in your
+own terminal.
 
-**Tool Info** is the cheat sheet (syntax + flags). It does not run
-anything.
+**Tool Info** is the cheat sheet (syntax + flags), grouped in tabs. It
+does not run anything.
 
 You can still type nmap/gobuster yourself in the logged terminal.
 
 ## 6. Finish
 
 1. Evidence + screenshots for milestones
-2. Status → Validate
-3. Status → ZIP backup
+2. Status → ZIP for host (download off Pwnbox)
+3. Optional: `zip -e` then send via https://wormhole.app
 4. `exit` the logged shell
 5. Keep the ZIP
 
