@@ -116,7 +116,8 @@
             <select id="log-select"></select>
           </label>
           <button type="button" class="btn ghost" id="btn-log-refresh">Refresh</button>
-          <span class="quiet">Live tail. Each ./htb start uses the next free file: session.log, session2.log, …</span>
+          <label class="check"><input type="checkbox" id="log-live" checked /> Live view</label>
+          <span class="quiet">Uncheck on a slow Pwnbox to skip live polling. Refresh still loads the file. Each ./htb start uses session.log, session2.log, …</span>
         </div>
         <pre id="log-view" class="console"></pre>
       </section>
@@ -394,11 +395,11 @@ git pull
           <p><strong>Split</strong> is raw markdown on the left and preview on the right. <strong>Write</strong> is the editor only. <strong>Nice view</strong> is the formatted preview (read-only) after you finish writing. Switch back to Write to edit again.</p>
 
           <h3>Logs</h3>
-          <p>The Logs tab always tails the live session. Each <code>./htb</code> start gets a new file: <code>session.log</code>, then <code>session2.log</code>, and so on.</p>
+          <p><strong>Live view</strong> (checked by default) tails the session. Uncheck it on a slow Pwnbox so the GUI does not keep fetching the log. Use <strong>Refresh</strong> when you want a snapshot. Each <code>./htb</code> start gets <code>session.log</code>, then <code>session2.log</code>, and so on.</p>
         </article>
       </section>
     </main>
   </div>
-  <script src="/app.js?v=19"></script>
+  <script src="/app.js?v=20"></script>
 </body>
 </html>

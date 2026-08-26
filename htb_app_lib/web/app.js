@@ -113,7 +113,7 @@
       $(`tab-${tab}`).classList.toggle("active", tab === name);
       document.querySelector(`[data-tab="${tab}"]`).classList.toggle("active", tab === name);
     });
-    if (name === "logs") refreshLogs(true);
+    if (name === "logs") refreshLogs(true).catch(() => {});
     if (name === "files") refreshFiles();
     if (name === "evidence") refreshEvidence();
     if (name === "status") refreshStatus();
@@ -944,9 +944,14 @@
       if (state.dirty) saveNotes().catch(() => {});
       if (state.reportDirty) saveReport().catch(() => {});
     }, 8000);
+    $("log-live").addEventListener("change", () => {
+      if ($("log-live").checked && $("tab-logs").classList.contains("active")) {
+        refreshLogs(true).catch(() => {});
+      }
+    });
     setInterval(() => {
       refreshState().catch(() => {});
-      if ($("tab-logs").classList.contains("active")) {
+      if ($("tab-logs").classList.contains("active") && $("log-live").checked) {
         refreshLogs(false).catch(() => {});
       }
     }, 2500);

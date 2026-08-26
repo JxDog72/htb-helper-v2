@@ -78,7 +78,7 @@ GUI sections:
 | Tab | Job |
 |-----|-----|
 | Notes | Full `.md` editor + live preview. `# Machine` title, `### Lab instructions`, `### Workflow`. Stamp `[HH:MM]` (category optional). |
-| Logs | Live tail of `session.log` (new file each `./htb` start) |
+| Logs | Optional live tail of `session.log` (uncheck **Live view** on a slow Pwnbox). New file each `./htb` start. |
 | Tools | Categories with sub-tools. Edit the command; copy a `tee` line for your own terminal; **Stop tool**; notes save is optional (default No). |
 | Tool Info | Cheat sheet with category tabs, CyberChef, official CVE links, ICS/Modbus |
 | Evidence / Files / Report / Status | Evidence without hashes. Status: ZIP or password-protected 7z, then SCP off Pwnbox. |
