@@ -7,7 +7,7 @@ Local field notebook for the HTB Enterprise research study.
 It keeps the original helper’s job — session logs, captured tool output,
 timestamped notes, evidence, screenshots, validation, ZIP backup — and
 adds a **localhost GUI** so notes can be real Markdown (`##` headings,
-lists, ` ```python ` fences) without fighting a numbered CLI prompt.
+lists, ` ```python `).
 
 The GUI is **not a remote service**. Python serves a page on
 `127.0.0.1` only. The terminal you started it from is still the place
