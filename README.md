@@ -114,7 +114,7 @@ scp USERNAME@htb-xxxxx.htb-cloud.com:/full/path/to/file.7z $env:USERPROFILE\Down
 
 ### 2. Encrypted 7z
 
-Set a password in Status and click **Create encrypted 7z**, then SCP the `.7z` the same way.
+Set a password in Status and click **Create encrypted 7z**, then share it to yourself through the wormhole.app, setting the allowed downloads to 1.
 
 ### 3. Personal VM
 
