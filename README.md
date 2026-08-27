@@ -1,6 +1,6 @@
 Inspired by: https://github.com/tjoliveros25/htb-research-helper.git
 
-# HTB Helper 4.0
+# HTB Helper 
 
 Local field notebook for the HTB Enterprise research study.
 
@@ -37,7 +37,7 @@ packages if they are missing (`python3`, `nmap`, `bsdutils` for
 `script`, `xdg-utils`, `scrot`). It does **not** pull the whole
 parrot-tools metapackage — the VM image already has gobuster/ffuf/nmap.
 
-First launch opens `http://127.0.0.1:8765/`. Fill in student ID, machine
+First launch opens `http://127.0.0.1:8765/`. Fill in HTB_ID, machine
 name, and target IP. After that, `./htb` also wraps **this** terminal in
 a logged shell. Keep it open. Use the browser for notes.
 
