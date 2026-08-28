@@ -13,6 +13,8 @@
     follow: true,
     setupSeeded: false,
     labChosen: false,
+    labPick: "",
+    toolsLoaded: false,
     reportDirty: false,
     cmdDirty: false,
     toolRunning: false,
@@ -118,17 +120,17 @@
     if (name === "evidence") refreshEvidence();
     if (name === "status") refreshStatus();
     if (name === "info") renderInfo();
-    if (name === "tools") loadTools();
-    if (name === "report") loadReport();
+    if (name === "tools" && !state.toolsLoaded) loadTools();
+    if (name === "report" && !state.reportDirty) loadReport();
   }
 
-  function insertAtCursor(textarea, text) {
+  function insertAtCursor(textarea, text, cursorOffset) {
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const before = textarea.value.slice(0, start);
     const after = textarea.value.slice(end);
     textarea.value = before + text + after;
-    const pos = start + text.length;
+    const pos = start + (cursorOffset == null ? text.length : cursorOffset);
     textarea.setSelectionRange(pos, pos);
     textarea.focus();
     if (textarea.id === "notes-editor") onNotesInput();
@@ -181,11 +183,13 @@
       return;
     }
     block.classList.remove("hidden");
+    const keep = state.labPick || sel.value;
     sel.innerHTML = labs.map((lab) => {
       const label = lab.machine_name || lab.id;
-      const selected = lab.id === current || lab.current ? " selected" : "";
-      return `<option value="${escapeHtml(lab.id)}"${selected}>${escapeHtml(label)}</option>`;
+      return `<option value="${escapeHtml(lab.id)}">${escapeHtml(label)}</option>`;
     }).join("");
+    if (keep && labs.some((lab) => lab.id === keep)) sel.value = keep;
+    else if (current) sel.value = current;
   }
 
   async function refreshState() {
@@ -226,9 +230,13 @@
 
   async function chooseLabDone() {
     state.labChosen = true;
+    state.toolsLoaded = false;
+    state.currentTool = null;
     $("setup-overlay").classList.add("hidden");
     await refreshState();
     await loadNotes();
+    await loadReport();
+    setTab("help");
   }
 
   function speedUpOn() {
@@ -336,6 +344,7 @@
   async function loadTools() {
     const data = await api("/api/tools");
     state.tools = data;
+    state.toolsLoaded = true;
     const nav = $("tool-nav");
     nav.innerHTML = data.groups.map((g, i) => (
       `<button type="button" data-g="${i}" class="${i === 0 ? "active" : ""}">${escapeHtml(g.name)}</button>`
@@ -373,7 +382,7 @@
     $("tool-summary").textContent = found.summary || "";
     $("tool-purpose").value = found.purpose || "";
     $("tool-target").value = state.tools.target || "";
-    $("tool-port").value = state.tools.port || "";
+    $("tool-port").value = found.kind === "nmap-port" ? (state.tools.port || "") : "";
     $("tool-missing").classList.toggle("hidden", found.installed);
     const fields = $("tool-fields");
     const lists = state.tools.wordlists || [];
@@ -391,6 +400,13 @@
     $("tool-copy").value = "";
     $("tool-extra").value = "";
     $("tool-notes").value = "no";
+    if (found.kind === "custom") {
+      $("tool-cmd").value = "";
+      $("tool-copy").value = "";
+      $("tool-cmd-preview").textContent = "Type the full command in the Command box.";
+      state.cmdDirty = true;
+      return;
+    }
     state.cmdDirty = false;
     previewCommand(true);
   }
@@ -647,7 +663,17 @@
       insertAtCursor($("notes-editor"), data.heading);
     });
     $("btn-heading").addEventListener("click", () => insertAtCursor($("notes-editor"), "## "));
-    $("btn-code").addEventListener("click", () => insertAtCursor($("notes-editor"), "```python\n\n```\n"));
+    $("btn-code").addEventListener("click", () => {
+      const open = "```python\n";
+      const close = "\n```";
+      insertAtCursor($("notes-editor"), open + close, open.length);
+    });
+    $("btn-notes-example").addEventListener("click", () => {
+      window.open("/examples/view?doc=notes", "_blank", "noopener");
+    });
+    $("btn-report-example").addEventListener("click", () => {
+      window.open("/examples/view?doc=report", "_blank", "noopener");
+    });
     $("btn-list").addEventListener("click", () => insertAtCursor($("notes-editor"), "- "));
     $("btn-append").addEventListener("click", async () => {
       const body = $("quick-body").value;
@@ -690,6 +716,9 @@
         $("setup-error").textContent = err.message;
       }
     });
+    $("lab-select").addEventListener("change", () => {
+      state.labPick = $("lab-select").value;
+    });
     $("btn-open-lab").addEventListener("click", async () => {
       $("setup-error").hidden = true;
       try {
@@ -728,6 +757,22 @@
       refreshLogs(true);
     });
     $("btn-log-refresh").addEventListener("click", () => refreshLogs(true));
+    $("btn-new-terminal").addEventListener("click", async () => {
+      try {
+        const data = await api("/api/terminal/spawn", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        if (data.file) {
+          state.logName = data.file;
+          state.logOffset = 0;
+          await refreshLogs(true);
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    });
     $("tool-nav").addEventListener("click", (e) => {
       const btn = e.target.closest("[data-g]");
       if (btn) showGroup(Number(btn.dataset.g));
@@ -746,6 +791,24 @@
     $("btn-tool-rebuild").addEventListener("click", () => {
       state.cmdDirty = false;
       previewCommand(true).catch(() => {});
+    });
+    $("btn-tool-send").addEventListener("click", async () => {
+      const cmd = ($("tool-cmd").value || "").trim();
+      if (!cmd) {
+        alert("Command is empty.");
+        return;
+      }
+      try {
+        await api("/api/tools/inject", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command: cmd }),
+        });
+        $("tool-out").textContent += "\n[sent to logged terminal]\n" + cmd + "\n";
+        $("tool-out").scrollTop = $("tool-out").scrollHeight;
+      } catch (err) {
+        alert(err.message);
+      }
     });
     function onToolFieldsChanged(e) {
       if (state.applyingPreview) return;
@@ -802,7 +865,7 @@
     $("evidence-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const fd = new FormData($("evidence-form"));
-      await api("/api/evidence", {
+      const data = await api("/api/evidence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -817,6 +880,16 @@
       $("evidence-source").disabled = false;
       refreshEvidence();
       loadNotes();
+      if (data.finding) {
+        if (state.reportDirty) {
+          applyFindingsBlock(data.finding + "\n");
+        } else if (data.report != null) {
+          $("report-editor").value = data.report;
+          onReportInput();
+          state.reportDirty = false;
+          $("report-save-state").textContent = "saved";
+        }
+      }
     });
     $("report-editor").addEventListener("input", onReportInput);
     $("report-editor").addEventListener("keydown", (e) => {
@@ -842,37 +915,54 @@
       state.reportDirty = false;
       $("report-save-state").textContent = "saved";
     });
+    function applyFindingsBlock(block) {
+      const ed = $("report-editor");
+      const text = ed.value;
+      const already = new Set();
+      const idRe = /\bE-\d+\b/gi;
+      let m;
+      while ((m = idRe.exec(text))) already.add(m[0].toUpperCase());
+      const lines = String(block || "").split("\n");
+      const fresh = lines.filter((line) => {
+        const hit = line.match(/\bE-\d+\b/i);
+        if (!hit) return line.trim().length > 0;
+        return !already.has(hit[0].toUpperCase());
+      });
+      const hasNew = fresh.some((line) => /^\s*-\s/.test(line) && /\bE-\d+\b/i.test(line));
+      if (!hasNew) return false;
+      const chunk = fresh.join("\n").replace(/\n+$/, "") + "\n";
+      const marker = "## Findings";
+      const i = text.indexOf(marker);
+      if (i < 0) {
+        ed.value = text + (text.endsWith("\n") || !text ? "" : "\n") + "\n## Findings\n\n" + chunk;
+        onReportInput();
+        return true;
+      }
+      const after = text.indexOf("\n", i);
+      const start = after >= 0 ? after + 1 : text.length;
+      const rest = text.slice(start);
+      const next = rest.search(/^## /m);
+      const insertAt = next < 0 ? text.length : start + next;
+      const head = text.slice(0, insertAt).replace(/\s+$/, "") + "\n\n";
+      let tail = text.slice(insertAt);
+      if (tail.startsWith("##")) tail = "\n" + tail;
+      ed.value = head + chunk + tail;
+      onReportInput();
+      return true;
+    }
     $("btn-report-insert").addEventListener("click", async () => {
       try {
         const data = await api("/api/report/findings", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-        const ed = $("report-editor");
-        const text = ed.value;
-        const already = new Set();
-        const idRe = /\bE-\d+\b/gi;
-        let m;
-        while ((m = idRe.exec(text))) already.add(m[0].toUpperCase());
-        const lines = String(data.block || "").split("\n");
-        const fresh = lines.filter((line) => {
-          const hit = line.match(/\bE-\d+\b/i);
-          if (!hit) return true;
-          return !already.has(hit[0].toUpperCase());
-        });
-        const hasNew = fresh.some((line) => /^\s*-\s/.test(line) && /\bE-\d+\b/i.test(line));
-        if (!hasNew) {
-          alert("No new evidence IDs to insert. Existing E-numbers are already in the report.");
+        if (data.report && !state.reportDirty) {
+          $("report-editor").value = data.report;
+          onReportInput();
+          state.reportDirty = false;
+          $("report-save-state").textContent = "saved";
           return;
         }
-        const block = fresh.join("\n").replace(/\n+$/, "") + "\n";
-        const marker = "## Findings";
-        const i = text.indexOf(marker);
-        if (i >= 0) {
-          const nl = text.indexOf("\n", i);
-          const pos = nl >= 0 ? nl + 1 : text.length;
-          ed.value = text.slice(0, pos) + "\n" + block + text.slice(pos);
-        } else {
-          ed.value = text + (text.endsWith("\n") || !text ? "" : "\n") + "\n" + block;
+        if (!applyFindingsBlock(data.block || "")) {
+          alert("No new evidence IDs to insert. Existing E-numbers are already in the report.");
         }
-        onReportInput();
       } catch (err) {
         alert(err.message);
       }
@@ -892,10 +982,14 @@
         "Windows PowerShell:\n" +
         "scp " + remote + " $env:USERPROFILE\\Downloads\\";
     }
-    function showExport(data, dest) {
+    function showExport(data, dest, wormhole) {
       dest.textContent = "Saved: " + (data.file || "") + (data.copied && data.copied.length ? "  [" + data.copied.join(", ") + "]" : "");
-      if (data.file) $("pwn-path").value = data.file;
-      rebuildScp();
+      if (wormhole) {
+        dest.textContent += "  Upload that file at https://wormhole.app for one download (not SCP).";
+      } else if (data.file) {
+        $("pwn-path").value = data.file;
+        rebuildScp();
+      }
     }
     ["pwn-host", "pwn-user", "pwn-path"].forEach((id) => {
       $(id).addEventListener("input", rebuildScp);
@@ -932,7 +1026,7 @@
             username: $("pwn-user").value,
           }),
         });
-        showExport(data, $("zip7-out"));
+        showExport(data, $("zip7-out"), true);
       } catch (err) {
         $("zip7-out").textContent = err.message;
       }

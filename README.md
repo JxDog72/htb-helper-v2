@@ -1,6 +1,6 @@
 Inspired by: https://github.com/tjoliveros25/htb-research-helper.git
 
-# HTB Helper 
+# HTB Helper 2.0
 
 Local field notebook for the HTB Enterprise research study.
 
@@ -19,6 +19,12 @@ Target lab OS: **Parrot OS** HTB VMs (also Kali/Debian). Windows lab VMs
 are supported with the same GUI.
 
 No pip packages. Python 3.9+ standard library only.
+
+**License:** [MIT](LICENSE). GitHub will show “MIT license” on the repo.
+This is a study aid for **authorized HTB Enterprise labs only**. The
+author is **not responsible** for damage, data loss, misuse, or attacks.
+You are solely responsible for staying in scope and following HTB rules
+and the law.
 
 ---
 
@@ -78,10 +84,10 @@ GUI sections:
 | Tab | Job |
 |-----|-----|
 | Notes | Full `.md` editor + live preview. `# Machine` title, `### Lab instructions`, `### Workflow`. Stamp `[HH:MM]` (category optional). |
-| Logs | Optional live tail of `session.log`. Header **Speed up** skips 2.5s polling and appends log bytes. New file each `./htb` start. |
-| Tools | Categories with sub-tools. Edit the command; copy a `tee` line for your own terminal; **Stop tool**; notes save is optional (default No). |
+| Logs | Optional live tail of `session.log`. **New terminal** opens another captured shell as `terminal2_session.log`. Header **Speed up** skips 2.5s polling. |
+| Tools | Categories with sub-tools. **Send to terminal** types the command into the logged shell. **Run and capture** also appends to `session.log`. Custom: one Command box. |
 | Tool Info | Cheat sheet with category tabs, CyberChef, official CVE links, ICS/Modbus |
-| Evidence / Files / Report / Status | Evidence without hashes. Status: ZIP or password-protected 7z, then SCP off Pwnbox. |
+| Evidence / Files / Report / Status | Evidence without hashes. Status: ZIP then SCP, or encrypted 7z then [wormhole.app](https://wormhole.app). |
 
 Notes auto-save. `Ctrl+S` save, `Ctrl+N` stamp, `Ctrl+1`–`8` tabs,
 `Ctrl+Enter` appends the quick-add box.
@@ -103,18 +109,20 @@ Fill hostname and username from HTB **View instance details**. Path is filled af
 Command Prompt:
 
 ```text
-scp USERNAME@htb-xxxxx.htb-cloud.com:/full/path/to/file.7z %USERPROFILE%\Downloads\
+scp USERNAME@htb-xxxxx.htb-cloud.com:/full/path/to/file.zip %USERPROFILE%\Downloads\
 ```
 
 PowerShell:
 
 ```text
-scp USERNAME@htb-xxxxx.htb-cloud.com:/full/path/to/file.7z $env:USERPROFILE\Downloads\
+scp USERNAME@htb-xxxxx.htb-cloud.com:/full/path/to/file.zip $env:USERPROFILE\Downloads\
 ```
 
-### 2. Encrypted 7z
+### 2. Encrypted 7z (not SCP)
 
-Set a password in Status and click **Create encrypted 7z**, then share it to yourself through the wormhole.app, setting the allowed downloads to 1.
+Set a password in Status and click **Create encrypted 7z**. Then open
+[wormhole.app](https://wormhole.app), upload the `.7z`, and share it for
+**one download**. Do not use the SCP box for this path.
 
 ### 3. Personal VM
 
@@ -151,6 +159,36 @@ this lab (machine / IP / port), switch to an existing folder under
 `machines/`, or start a **new** machine (new workspace; the old one stays).
 While a logged session is active, workspace moves are blocked until you
 exit the menu and run `./htb --cli` again.
+
+---
+
+## Updating without losing lab data
+
+`machines/` (your notes, logs, evidence, report) and `htb_app_lib/config.json`
+are **not** in git. Pulling will not delete them.
+
+```bash
+cd htb-helper-v2
+# 1. Stop the helper: type exit in the logged terminal, then Ctrl+C
+git stash          # only if git says you have local edits
+git pull
+./htb              # pick the same lab on the start screen
+```
+
+If `git pull` complains about local files, `git stash` then `git pull`
+then `git stash pop`. Your lab folders stay on disk either way.
+
+---
+
+## License and disclaimer
+
+MIT License — see [`LICENSE`](LICENSE).
+
+HTB Helper is provided **as is**, with **no warranty**. The author
+(JxDog72) is not liable for any claim, damage, data loss, or other
+liability arising from use of the software. Use it only on systems you
+are authorized to test (HTB Enterprise labs for this study). Misuse,
+attacks, or out-of-scope scanning are your responsibility.
 
 ---
 

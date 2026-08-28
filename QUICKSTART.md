@@ -1,4 +1,4 @@
-# HTB Helper 4.0 — Quick start (Parrot VM)
+# HTB Helper 2.0 — Quick start (Parrot VM)
 
 ## 1. Copy onto the box
 

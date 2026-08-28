@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HTB Helper example</title>
+  <link rel="stylesheet" href="/app.css?v=16" />
+  <style>
+    body { padding: 1.5rem 2rem 3rem; max-width: 52rem; margin: 0 auto; }
+    .banner { color: var(--quiet); margin: 0 0 1rem; }
+    .banner strong { color: var(--copper); }
+  </style>
+</head>
+<body>
+  <p class="banner"><strong>Example only.</strong> This is a sample write-up from a finished lab. Your notes and report files are not changed.</p>
+  <article class="paper" id="view">Loading…</article>
+  <script>
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[c]));
+    }
+    function renderMarkdown(src) {
+      const fences = [];
+      let text = String(src || "").replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+        const i = fences.length;
+        fences.push(`<pre><div class="code-lang">${escapeHtml(lang)}</div><code>${escapeHtml(code.replace(/\n$/, ""))}</code></pre>`);
+        return `\0F${i}\0`;
+      });
+      const lines = text.split("\n");
+      const out = [];
+      let list = null;
+      const flushList = () => { if (list) { out.push(`<ul>${list.join("")}</ul>`); list = null; } };
+      const inline = (s) => escapeHtml(s)
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+      for (const line of lines) {
+        const fence = line.match(/^\0F(\d+)\0$/);
+        if (fence) { flushList(); out.push(fences[Number(fence[1])]); continue; }
+        if (/^---+$/.test(line.trim())) { flushList(); out.push("<hr>"); continue; }
+        const h = line.match(/^(#{1,4})\s+(.*)$/);
+        if (h) { flushList(); out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); continue; }
+        const li = line.match(/^\s*[-*]\s+(.*)$/);
+        if (li) { list = list || []; list.push(`<li>${inline(li[1])}</li>`); continue; }
+        if (/^\|.+\|$/.test(line.trim())) {
+          flushList();
+          out.push(`<p>${inline(line)}</p>`);
+          continue;
+        }
+        if (!line.trim()) { flushList(); continue; }
+        flushList();
+        out.push(`<p>${inline(line)}</p>`);
+      }
+      flushList();
+      return out.join("\n");
+    }
+    (async () => {
+      const doc = new URLSearchParams(location.search).get("doc") === "report" ? "report" : "notes";
+      document.title = doc === "report" ? "Example report" : "Example notes";
+      try {
+        const res = await fetch("/examples/" + doc + ".md");
+        if (!res.ok) throw new Error("Could not load example.");
+        document.getElementById("view").innerHTML = renderMarkdown(await res.text());
+      } catch (err) {
+        document.getElementById("view").textContent = err.message;
+      }
+    })();
+  </script>
+</body>
+</html>

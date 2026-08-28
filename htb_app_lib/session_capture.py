@@ -21,6 +21,8 @@ import threading
 _pause = threading.Event()
 _log_lock = threading.Lock()
 _log_fp = None
+_pty_master = None
+_windows_stdin = None
 
 
 def session_paused():
@@ -47,6 +49,52 @@ def set_session_paused(paused: bool) -> str:
     return msg.strip()
 
 
+def append_to_session_log(text: str) -> bool:
+    """Write extra text into the live session log (GUI tool runs, etc.)."""
+    global _log_fp
+    chunk = str(text or "")
+    if not chunk:
+        return False
+    if not chunk.endswith("\n"):
+        chunk += "\n"
+    with _log_lock:
+        if _log_fp is None:
+            return False
+        try:
+            _log_fp.write(chunk)
+            _log_fp.flush()
+            return True
+        except Exception:
+            return False
+
+
+def inject_to_session(command: str) -> bool:
+    """Type a command into the live logged shell, as if the student typed it."""
+    line = str(command or "").rstrip()
+    if not line:
+        return False
+    payload = line + "\n"
+    if os.name == "nt":
+        stdin = _windows_stdin
+        if stdin is None:
+            return False
+        try:
+            data = payload.replace("\n", "\r\n").encode(sys.stdout.encoding or "utf-8", errors="replace")
+            stdin.write(data)
+            stdin.flush()
+            return True
+        except Exception:
+            return False
+    master = _pty_master
+    if master is None:
+        return False
+    try:
+        os.write(master, payload.encode("utf-8", errors="replace"))
+        return True
+    except OSError:
+        return False
+
+
 def run_logged_shell(log_file: Path) -> int:
     log_file = Path(log_file)
     log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -58,8 +106,11 @@ def run_logged_shell(log_file: Path) -> int:
 def _run_unix(log_file: Path) -> int:
     """PTY capture so pause/resume can stop writing without killing the shell."""
     import pty
+    import select
+    import termios
+    import tty
 
-    global _log_fp
+    global _log_fp, _pty_master
     shell = os.environ.get("SHELL") or "/bin/bash"
     _pause.clear()
     log = log_file.open("a", encoding="utf-8", errors="replace")
@@ -73,26 +124,20 @@ def _run_unix(log_file: Path) -> int:
     _log_fp = log
     print("[+] Console capture is ON. Pause/Resume is in the Session menu in the GUI.")
     print("[+] Ctrl+C stops the current command, not the logger.")
+    print("[+] Tools → Send to terminal types the command into this shell.")
     print("[+] Type 'exit' when the session is finished.\n")
 
-    def read(fd):
-        data = os.read(fd, 1024)
-        if data and not _pause.is_set():
-            with _log_lock:
-                try:
-                    log.write(data.decode("utf-8", errors="replace"))
-                    log.flush()
-                except Exception:
-                    pass
-        return data
+    def _copy_winsize(master_fd):
+        try:
+            import fcntl
+            import struct
+            packed = fcntl.ioctl(sys.stdin.fileno(), termios.TIOCGWINSZ, struct.pack("HHHH", 0, 0, 0, 0))
+            fcntl.ioctl(master_fd, termios.TIOCSWINSZ, packed)
+        except Exception:
+            pass
 
-    old = signal.getsignal(signal.SIGINT)
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
-    try:
-        pty.spawn(shell, read)
-        return 0
-    except OSError:
-        print("[!] PTY capture failed; falling back to `script` (pause will not hide output).")
+    def _fallback_script():
+        print("[!] PTY capture failed; falling back to `script` (Send to terminal will not work).")
         if shutil.which("script"):
             if sys.platform == "darwin":
                 cmd = ["script", "-q", "-a", "-F", str(log_file), shell]
@@ -101,9 +146,90 @@ def _run_unix(log_file: Path) -> int:
             result = subprocess.run(cmd, check=False)
             return result.returncode or 0
         return 1
-    finally:
+
+    old_sig = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    old_term = None
+    pid = None
+    try:
+        pid, master = pty.fork()
+    except OSError:
         try:
-            signal.signal(signal.SIGINT, old)
+            signal.signal(signal.SIGINT, old_sig)
+        except Exception:
+            pass
+        code = _fallback_script()
+        with _log_lock:
+            try:
+                log.write(f"\n===== session ended {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} =====\n")
+                log.close()
+            except Exception:
+                pass
+            _log_fp = None
+        return code
+
+    if pid == 0:
+        os.execvp(shell, [shell])
+        os._exit(127)
+
+    _pty_master = master
+    _copy_winsize(master)
+    try:
+        old_term = termios.tcgetattr(sys.stdin.fileno())
+        tty.setraw(sys.stdin.fileno())
+    except Exception:
+        old_term = None
+
+    try:
+        while True:
+            try:
+                readable, _, _ = select.select([master, sys.stdin], [], [], 0.2)
+            except (InterruptedError, ValueError, OSError):
+                break
+            if sys.stdin in readable:
+                try:
+                    data = os.read(sys.stdin.fileno(), 1024)
+                except OSError:
+                    data = b""
+                if not data:
+                    break
+                try:
+                    os.write(master, data)
+                except OSError:
+                    break
+            if master in readable:
+                try:
+                    data = os.read(master, 1024)
+                except OSError:
+                    data = b""
+                if not data:
+                    break
+                try:
+                    os.write(sys.stdout.fileno(), data)
+                except OSError:
+                    pass
+                if data and not _pause.is_set():
+                    with _log_lock:
+                        try:
+                            log.write(data.decode("utf-8", errors="replace"))
+                            log.flush()
+                        except Exception:
+                            pass
+        if pid:
+            try:
+                os.waitpid(pid, 0)
+            except ChildProcessError:
+                pass
+        return 0
+    finally:
+        _pty_master = None
+        if old_term is not None:
+            try:
+                termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_term)
+            except Exception:
+                pass
+        try:
+            signal.signal(signal.SIGINT, old_sig)
         except Exception:
             pass
         with _log_lock:
@@ -131,7 +257,7 @@ def _run_windows_piped(log_file: Path) -> int:
         f"====================================================\n"
     )
 
-    global _log_fp
+    global _log_fp, _windows_stdin
     _pause.clear()
     log = log_file.open("a", encoding="utf-8", errors="replace")
     log.write(header)
@@ -147,6 +273,7 @@ def _run_windows_piped(log_file: Path) -> int:
         bufsize=0,
         creationflags=CREATE_NEW_PROCESS_GROUP,
     )
+    _windows_stdin = proc.stdin
 
     stop = threading.Event()
 
@@ -232,6 +359,7 @@ def _run_windows_piped(log_file: Path) -> int:
             log.write(f"\n===== session ended {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} =====\n")
             log.close()
             _log_fp = None
+            _windows_stdin = None
 
     return proc.returncode or 0
 

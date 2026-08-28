@@ -313,6 +313,53 @@ def report_file(workspace):
     return report_dir(workspace) / "report.md"
 
 
+def default_report_text(config, suggestions=None):
+    """Starter report.md so a new lab already has the write-up structure."""
+    machine = (config or {}).get("machine_name") or "Unknown"
+    target = (config or {}).get("target_ip") or ""
+    port = (config or {}).get("target_port") or "None"
+    lines = [
+        f"# HTB Challenge: {machine}",
+        "",
+        "## Executive Summary",
+        "",
+        "",
+        "## Scope",
+        "",
+        f"This report covers the authorized HTB machine **{machine}** at `{target}`",
+        f"(assigned port: `{port}`). Testing was limited to that host and the engagement rules.",
+        "",
+        "## Methodology",
+        "",
+        "",
+        "## Findings",
+        "",
+    ]
+    if suggestions:
+        lines.append("<small>")
+        lines.append("")
+        lines.append("Suggested from the evidence log — rewrite in your words, then delete this list.")
+        lines.append("")
+        lines.extend(suggestions)
+        lines.append("")
+        lines.append("</small>")
+        lines.append("")
+    else:
+        lines.append("")
+    lines.extend([
+        "## Attack narrative",
+        "",
+        "",
+        "## Remediation",
+        "",
+        "",
+        "## Conclusion",
+        "",
+        "",
+    ])
+    return "\n".join(lines) + "\n"
+
+
 def report_media_dir(workspace):
     return report_dir(workspace) / "media"
 
@@ -539,6 +586,10 @@ def setup_workspace(config):
             "Include any files you were given for this lab\n",
             encoding="utf-8",
         )
+
+    report_path = report_file(workspace)
+    if not report_path.exists():
+        report_path.write_text(default_report_text(config), encoding="utf-8")
 
     metadata_file = metadata_path(workspace)
     if not metadata_file.exists():

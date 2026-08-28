@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-HTB Helper 4.0 — local field notebook.
+HTB Helper 2.0 — local field notebook.
 
 A stdlib-only localhost GUI (127.0.0.1) so notes can be real Markdown,
 plus a logged shell in the terminal this process was started from.
@@ -29,13 +29,20 @@ import time
 import webbrowser
 
 import htb_helper as engine
-from session_capture import decode_log_bytes, run_logged_shell, session_paused, set_session_paused
+from session_capture import (
+    append_to_session_log,
+    decode_log_bytes,
+    inject_to_session,
+    run_logged_shell,
+    session_paused,
+    set_session_paused,
+)
 from tools_catalog import COMMON_WORDLISTS, TOOL_GROUPS, TOOL_INFO
 
 LIB = Path(__file__).resolve().parent
 ROOT = LIB.parent
 WEB = LIB / "web"
-APP_VERSION = "4.0.0"
+APP_VERSION = "2.0.0"
 DEFAULT_PORT = 8765
 
 STATE = {
@@ -485,9 +492,9 @@ def tool_target(fields, config):
     return str(fields.get("target") or config.get("target_ip") or "").strip()
 
 
-def tool_port(fields, config):
+def tool_port(fields, config, *, fallback=False):
     raw = fields.get("port")
-    if raw in (None, ""):
+    if raw in (None, "") and fallback:
         raw = config.get("target_port")
     if raw in (None, "", 0, "0"):
         return None
@@ -548,7 +555,7 @@ def build_command(tool, fields, extra, config):
 
     kind = tool["kind"]
     target = tool_target(fields, config)
-    port = tool_port(fields, config)
+    port = tool_port(fields, config, fallback=(kind == "nmap-port"))
     if not target and kind != "custom":
         raise RuntimeError("Target IP is required.")
     if kind == "ping":
@@ -563,7 +570,7 @@ def build_command(tool, fields, extra, config):
     if kind == "custom":
         command_text = (fields.get("command") or "").strip()
         if not command_text:
-            raise RuntimeError("Command is empty.")
+            raise RuntimeError("Type the command in the Command box.")
         if engine.shell_meta_present(command_text):
             raise RuntimeError("Pipes, redirects, and ';' are not allowed here.")
         return shlex.split(command_text) + extra_parts
@@ -573,17 +580,22 @@ def build_command(tool, fields, extra, config):
         stamp = engine.timestamp_seconds()
         logs = engine.logs_dir(ws)
         logs.mkdir(parents=True, exist_ok=True)
+        nmap_args = list(tool.get("nmap_args") or [])
+        full_tcp = "-p-" in nmap_args
         if kind == "nmap-port" and port is None:
             raise RuntimeError("Set a port for this scan (lab assigned port, or another port you found).")
-        if port:
+        if kind == "nmap-port" or (port and not full_tcp):
             nmap_file = logs / f"nmap_port_{port}_{stamp}.nmap"
         else:
             nmap_file = logs / f"nmap_scan_{stamp}.nmap"
-        command = ["nmap"] + list(tool.get("nmap_args") or [])
-        # Full-port scans already include -p-; don't also pin a single port
-        # unless the student explicitly set one (then drop -p-).
-        if port:
+        command = ["nmap"] + nmap_args
+        # nmap -p- must stay all TCP ports. Assigned lab port is only used
+        # for "Nmap assigned port", or if the student typed a Port on a
+        # non-full scan.
+        if kind == "nmap-port":
             command = [arg for arg in command if arg != "-p-"]
+            command.extend(["-p", str(port)])
+        elif port and not full_tcp and "-p" not in command:
             command.extend(["-p", str(port)])
         # .txt is the streamed capture; .nmap is nmap's own text format. No xml/gnmap.
         command.extend(["-oN", str(nmap_file), target])
@@ -651,8 +663,12 @@ def collect_tool_fields(data):
 
 
 def resolve_run_command(tool, fields, data):
-    if data.get("command_edited"):
-        return parse_command_override(data.get("command") or "")
+    if data.get("command_edited") or tool.get("kind") == "custom":
+        override = str(data.get("command") or "").strip()
+        if override:
+            return parse_command_override(override)
+        if tool.get("kind") == "custom":
+            raise RuntimeError("Type the command in the Command box.")
     return build_command(tool, fields, data.get("extra") or "", STATE["config"])
 
 
@@ -678,8 +694,9 @@ def fill_defaults(tool, fields, config):
     fields = dict(fields or {})
     if not str(fields.get("target") or "").strip():
         fields["target"] = str(config.get("target_ip") or "")
-    if "port" not in fields and config.get("target_port") not in (None, "", 0):
-        fields["port"] = str(config.get("target_port"))
+    if tool.get("kind") == "nmap-port" and not str(fields.get("port") or "").strip():
+        if config.get("target_port") not in (None, "", 0):
+            fields["port"] = str(config.get("target_port"))
     for spec in tool.get("fields") or []:
         name = spec["name"]
         if not fields.get(name) and spec.get("default"):
@@ -811,6 +828,16 @@ def finish_tool_run(tool, command, purpose, description, result, output_file, in
     return run_record
 
 
+def _format_finding_line(eid, phase, description, when=""):
+    label = str(eid)
+    if phase:
+        label += f" ({phase})"
+    if when:
+        label += f" [{when}]"
+    label += f": {description}"
+    return f"- {label}"
+
+
 def evidence_suggestion_lines(workspace):
     """Short bullets from evidence.md — no headings, for the student to rewrite."""
     path = engine.evidence_file(workspace)
@@ -824,27 +851,25 @@ def evidence_suggestion_lines(workspace):
     current_id = None
     phase = ""
     description = ""
+    when = ""
     for line in text.splitlines():
         heading = re.match(r"^## (E-\d+)\s*$", line)
         if heading:
             if current_id and description:
-                label = f"{current_id}: {description}"
-                if phase:
-                    label = f"{current_id} ({phase}): {description}"
-                suggestions.append(f"- {label}")
+                suggestions.append(_format_finding_line(current_id, phase, description, when))
             current_id = heading.group(1)
             phase = ""
             description = ""
+            when = ""
             continue
         if line.startswith("- Phase:"):
             phase = line.split(":", 1)[1].strip()
         elif line.startswith("- Description:"):
             description = line.split(":", 1)[1].strip()
+        elif line.startswith("- Time:"):
+            when = line.split(":", 1)[1].strip()
     if current_id and description:
-        label = f"{current_id}: {description}"
-        if phase:
-            label = f"{current_id} ({phase}): {description}"
-        suggestions.append(f"- {label}")
+        suggestions.append(_format_finding_line(current_id, phase, description, when))
     return suggestions
 
 
@@ -895,13 +920,55 @@ def findings_insert_block():
     suggestions = evidence_suggestion_lines(ws)
     if not suggestions:
         return ""
-    lines = [
-        "Suggested from the evidence log — rewrite in your words, then delete this list.",
-        "",
-    ]
-    lines.extend(suggestions)
-    lines.append("")
-    return "\n".join(lines)
+    return "\n".join(suggestions) + "\n"
+
+
+def merge_findings_into_report(text, new_lines):
+    """Append new E-ID bullets at the *end* of ## Findings (not above older ones)."""
+    text = text or ""
+    existing = {m.group(0).upper() for m in re.finditer(r"\bE-\d+\b", text, flags=re.I)}
+    fresh = []
+    for line in new_lines:
+        line = str(line).rstrip()
+        if not line:
+            continue
+        hit = re.search(r"\bE-\d+\b", line, flags=re.I)
+        if hit and hit.group(0).upper() in existing:
+            continue
+        fresh.append(line)
+        if hit:
+            existing.add(hit.group(0).upper())
+    if not fresh:
+        return text, False
+    block = "\n".join(fresh) + "\n"
+    marker = "## Findings"
+    index = text.find(marker)
+    if index < 0:
+        joined = text.rstrip() + "\n\n## Findings\n\n" + block
+        return joined, True
+    after = text.find("\n", index)
+    start = after + 1 if after >= 0 else len(text)
+    nxt = re.search(r"^## ", text[start:], flags=re.M)
+    insert_at = start + nxt.start() if nxt else len(text)
+    head = text[:insert_at].rstrip() + "\n\n"
+    tail = text[insert_at:]
+    if tail and not tail.startswith("\n") and not tail.startswith("##"):
+        tail = "\n" + tail
+    elif tail.startswith("##"):
+        tail = "\n" + tail
+    return head + block + tail, True
+
+
+def append_findings_to_report_file(lines):
+    path = report_path()
+    if not path:
+        raise RuntimeError("Workspace is not configured yet.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    current = path.read_text(encoding="utf-8") if path.exists() else engine.default_report_text(STATE["config"] or {})
+    updated, changed = merge_findings_into_report(current, lines)
+    if changed:
+        path.write_text(updated, encoding="utf-8")
+    return updated, changed
 
 
 def workspace_file(rel: str):
@@ -920,54 +987,96 @@ def build_report():
     config = STATE["config"] or {}
     if not ws:
         raise RuntimeError("Workspace is not configured yet.")
-    machine = config.get("machine_name") or "Unknown"
-    target = config.get("target_ip") or ""
-    port = config.get("target_port") or "None"
-    suggestions = evidence_suggestion_lines(ws)
-    lines = [
-        f"# HTB Challenge: {machine}",
-        "",
-        "## Executive Summary",
-        "",
-        "",
-        "## Scope",
-        "",
-        f"This report covers the authorized HTB machine **{machine}** at `{target}`",
-        f"(assigned port: `{port}`). Testing was limited to that host and the engagement rules.",
-        "",
-        "## Methodology",
-        "",
-        "",
-        "## Findings",
-        "",
-    ]
-    if suggestions:
-        lines.append("<small>")
-        lines.append("")
-        lines.append("Suggested from the evidence log — rewrite in your words, then delete this list.")
-        lines.append("")
-        lines.extend(suggestions)
-        lines.append("")
-        lines.append("</small>")
-        lines.append("")
-    else:
-        lines.append("")
-    lines.extend([
-        "## Attack narrative",
-        "",
-        "",
-        "## Remediation",
-        "",
-        "",
-        "## Conclusion",
-        "",
-        "",
-    ])
-    text = "\n".join(lines) + "\n"
+    text = engine.default_report_text(config, evidence_suggestion_lines(ws) or None)
     dest = engine.report_file(ws)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(text, encoding="utf-8")
     return text
+
+
+def log_gui_tool_to_session(command, output_file, result):
+    stamp = human_ts()
+    cmd = format_command(command)
+    snippet = (result.get("output") or "")[-8000:]
+    code = result.get("returncode")
+    block = (
+        f"\n===== GUI tool {stamp} =====\n"
+        f"$ {cmd}\n"
+        f"{snippet}"
+        f"\n===== GUI tool exit {code}  ({engine.relative_path(STATE['workspace'], output_file) if STATE['workspace'] else output_file}) =====\n"
+    )
+    if append_to_session_log(block):
+        return True
+    log = STATE.get("session_log")
+    if not log:
+        return False
+    try:
+        Path(log).parent.mkdir(parents=True, exist_ok=True)
+        with Path(log).open("a", encoding="utf-8", errors="replace") as handle:
+            handle.write(block)
+        return True
+    except OSError:
+        return False
+
+
+def next_spawned_session_log(workspace):
+    logs = engine.logs_dir(workspace)
+    logs.mkdir(parents=True, exist_ok=True)
+    number = 2
+    while (logs / f"terminal{number}_session.log").exists():
+        number += 1
+    return logs / f"terminal{number}_session.log"
+
+
+def spawn_logged_terminal():
+    ws = STATE["workspace"]
+    if not ws:
+        raise RuntimeError("Pick or create a lab first.")
+    log_file = next_spawned_session_log(ws)
+    inner = [
+        sys.executable,
+        str(LIB / "htb_app.py"),
+        "--logged-shell",
+        str(log_file),
+        "--config",
+        str(STATE["config_path"]),
+        "--no-bootstrap",
+        "--no-browser",
+    ]
+    cwd = str(ws)
+    if os.name == "nt":
+        flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0x00000010)
+        subprocess.Popen(inner, cwd=cwd, creationflags=flags)
+        return log_file.name
+    quoted = " ".join(shlex.quote(part) for part in inner)
+    launchers = []
+    if shutil.which("xfce4-terminal"):
+        launchers.append(["xfce4-terminal", f"--working-directory={cwd}", "-e", quoted])
+    if shutil.which("mate-terminal"):
+        launchers.append(["mate-terminal", f"--working-directory={cwd}", "-e", quoted])
+    if shutil.which("gnome-terminal"):
+        launchers.append(["gnome-terminal", f"--working-directory={cwd}", "--"] + inner)
+    if shutil.which("konsole"):
+        launchers.append(["konsole", "--workdir", cwd, "-e"] + inner)
+    if shutil.which("x-terminal-emulator"):
+        launchers.append(["x-terminal-emulator", "-e"] + inner)
+    if shutil.which("xterm"):
+        launchers.append(["xterm", "-e"] + inner)
+    last_err = "No terminal emulator found (xfce4-terminal, mate-terminal, gnome-terminal, xterm)."
+    for cmd in launchers:
+        try:
+            subprocess.Popen(
+                cmd,
+                cwd=cwd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            return log_file.name
+        except OSError as exc:
+            last_err = str(exc)
+    raise RuntimeError(last_err)
 
 
 def tools_public():
@@ -1035,6 +1144,17 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/app.js":
             self._send(200, "application/javascript; charset=utf-8", (WEB / "app.js").read_bytes())
+            return
+        if path in ("/examples/view", "/example.html"):
+            self._send(200, "text/html; charset=utf-8", (WEB / "example.html").read_bytes())
+            return
+        if path in ("/examples/notes.md", "/examples/report.md"):
+            name = "notes.md" if path.endswith("notes.md") else "report.md"
+            dest = WEB / "examples" / name
+            if not dest.is_file():
+                self._json({"error": "Example file missing."}, 404)
+                return
+            self._send(200, "text/markdown; charset=utf-8", dest.read_bytes())
             return
 
         try:
@@ -1256,7 +1376,17 @@ class Handler(BaseHTTPRequestHandler):
                     compact=True,
                 )
                 text = ev_path.read_text(encoding="utf-8")
-                self._json({"ok": True, "id": f"E-{evidence_id:03d}", "text": text})
+                finding = _format_finding_line(
+                    f"E-{evidence_id:03d}", phase, description, human_ts(),
+                )
+                report_text, _ = append_findings_to_report_file([finding])
+                self._json({
+                    "ok": True,
+                    "id": f"E-{evidence_id:03d}",
+                    "text": text,
+                    "finding": finding,
+                    "report": report_text,
+                })
                 return
 
             if path == "/api/screenshot":
@@ -1326,7 +1456,29 @@ class Handler(BaseHTTPRequestHandler):
                 block = findings_insert_block()
                 if not block:
                     raise RuntimeError("No evidence entries to insert yet.")
-                self._json({"ok": True, "block": block})
+                path_r = report_path()
+                current = path_r.read_text(encoding="utf-8") if path_r and path_r.exists() else ""
+                lines = [ln for ln in block.splitlines() if ln.strip()]
+                updated, changed = merge_findings_into_report(current, lines)
+                if changed and path_r:
+                    write_report(updated)
+                self._json({"ok": True, "block": block, "report": updated, "changed": changed})
+                return
+
+            if path == "/api/terminal/spawn":
+                name = spawn_logged_terminal()
+                self._json({"ok": True, "file": name})
+                return
+
+            if path == "/api/tools/inject":
+                command = str(data.get("command") or "").strip()
+                if not command:
+                    raise RuntimeError("Command is empty.")
+                if not STATE["session_active"]:
+                    raise RuntimeError("No live session. Start with ./htb (not --gui-only), then Send to terminal.")
+                if not inject_to_session(command):
+                    raise RuntimeError("Could not type into the logged terminal.")
+                self._json({"ok": True})
                 return
 
             if path == "/api/session":
@@ -1426,6 +1578,7 @@ class Handler(BaseHTTPRequestHandler):
                 "copy_command": f'{cmd} | tee "{rel}"',
             })
             result = run_tool_streaming(command, output_file, lambda line: emit({"type": "line", "text": line}))
+            log_gui_tool_to_session(command, output_file, result)
             include_notes = data.get("include_notes") in (True, "yes", "true", 1, "1")
             record = finish_tool_run(
                 tool, command, purpose, description, result, output_file,
@@ -1531,7 +1684,8 @@ def parse_args():
     parser.add_argument("--gui-only", action="store_true", help="Serve the GUI without wrapping a logged shell.")
     parser.add_argument("--cli", action="store_true", help="Numbered menu (htb_helper.py). Option 14: view/change machine or start a new lab.")
     parser.add_argument("--no-browser", action="store_true")
-    parser.add_argument("--no-bootstrap", action="store_true")
+    parser.add_argument("--no-bootstrap", action="store_true", help="Skip apt install of python3/nmap/bsdutils/xdg-utils on start.")
+    parser.add_argument("--logged-shell", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--version", action="version", version=f"htb-helper {APP_VERSION}")
     return parser.parse_args()
@@ -1544,7 +1698,7 @@ def main():
     if not config_path.is_absolute():
         config_path = (ROOT / config_path).resolve()
 
-    if not args.no_bootstrap:
+    if not args.no_bootstrap and not args.logged_shell:
         result = try_bootstrap()
         if result.get("installed"):
             print("[+] " + result["message"])
@@ -1556,6 +1710,15 @@ def main():
         shutil.copy(LIB / "config.example.json", config_path)
         config = load_or_none(config_path)
     apply_config(config, config_path)
+
+    if args.logged_shell:
+        log_path = Path(args.logged_shell).expanduser()
+        if STATE["workspace"]:
+            os.chdir(STATE["workspace"])
+        print(f"[+] Extra terminal log: {log_path}")
+        print("[+] Working directory is the lab folder. Type exit when done.")
+        run_logged_shell(log_path)
+        return
 
     if args.cli:
         sys.argv = [sys.argv[0], "--config", str(config_path)]
