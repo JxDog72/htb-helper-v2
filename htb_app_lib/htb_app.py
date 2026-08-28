@@ -1142,20 +1142,29 @@ def prepare_terminal_send(data):
         first = command_text.split()[0] if command_text.split() else "command"
         label = Path(first).name
     if "nmap" in label.lower() or command_text.lower().startswith("nmap "):
-        nmap_file = unique_capture_path("nmap_scan", ".nmap")
+        nmap_file = unique_capture_path("nmap_scan", ".nmap").resolve()
         try:
             parts = shlex.split(command_text, posix=(os.name != "nt"))
             command_text = format_command(retarget_nmap_on(parts, nmap_file))
         except ValueError:
             pass
     out = unique_capture_path(label, ".txt")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    abs_out = str(out.resolve())
     rel = engine.relative_path(ws, out)
-    send = tee_command(command_text, rel)
+    send = tee_command(command_text, abs_out)
+    purpose = str(data.get("purpose") or "").strip() or "Sent to the logged terminal."
+    description = (tool or {}).get("name") or label
+    engine.save_command_record(
+        ws,
+        send,
+        description,
+        purpose,
+        output_file=rel,
+    )
     include_notes = data.get("include_notes") in (True, "yes", "true", 1, "1")
     notes_text = None
     if include_notes:
-        purpose = str(data.get("purpose") or "").strip() or "Sent to the logged terminal."
-        description = (tool or {}).get("name") or label
         with STATE["notes_lock"]:
             engine.append_timeline_note(
                 ws,
