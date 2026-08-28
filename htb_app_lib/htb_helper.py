@@ -455,6 +455,10 @@ def initialize_manifest(config, workspace):
                 "root_admin_flag": False,
             })
             manifest["helper"] = {"name": APP_NAME, "version": APP_VERSION}
+            manifest["student_id"] = config["student_id"]
+            manifest["machine_name"] = config["machine_name"]
+            manifest["target_ip"] = config["target_ip"]
+            manifest["assigned_port"] = config.get("target_port")
             save_manifest(workspace, manifest)
         return
 
@@ -2629,6 +2633,7 @@ def change_current_machine(config, workspace, config_path, session_active=False)
     target = prompt_line("Target IP", config.get("target_ip") or "")
     port = prompt_port(config.get("target_port"))
     updated = dict(config)
+    updated.pop("lab_folder", None)
     updated["student_id"] = student
     updated["machine_name"] = machine
     updated["target_ip"] = target
