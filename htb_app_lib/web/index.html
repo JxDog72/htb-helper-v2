@@ -375,6 +375,16 @@ git pull
           <h3>Where is my work?</h3>
           <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>logs/</code>, <code>screenshots/</code>, <code>notes/</code> (notes.md + evidence.md), <code>report/</code>, <code>files_given/</code>, and <code>machine_json/</code> (app-only).</p>
 
+          <h3>Rename a machine</h3>
+          <p>Renaming the folder under <code>machines/</code> does <strong>not</strong> change the name in the GUI. The label comes from <code>machine_json/metadata.json</code>.</p>
+          <ol>
+            <li>Stop the helper (<code>exit</code>, then Ctrl+C).</li>
+            <li>Open <code>machines/&lt;student&gt;_&lt;oldname&gt;/machine_json/metadata.json</code> and set <code>"machine_name"</code> (same file can change <code>target_ip</code> / <code>assigned_port</code>).</li>
+            <li>Optional: rename the folder to <code>student_newname</code> so it matches. Also set <code>"machine_name"</code> in <code>research_manifest.json</code> if that file exists.</li>
+            <li>Start <code>./htb</code> again and <strong>Open selected lab</strong> (or Switch lab) so the GUI reloads.</li>
+          </ol>
+          <p><code>./htb --cli</code> option <strong>14</strong> can rename the current lab and move the folder for you.</p>
+
           <h3>Export ZIP / 7z and copy off Pwnbox</h3>
           <p>Status → <strong>Create ZIP</strong> then SCP from your Windows PC (hostname + username from <strong>View instance details</strong>). <strong>No space after the colon.</strong></p>
           <pre class="syntax">scp USER@htb-xxxxx.htb-cloud.com:/full/path/to/file.zip %USERPROFILE%\Downloads\</pre>

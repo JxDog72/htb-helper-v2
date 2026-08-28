@@ -79,6 +79,13 @@ machine_json/      app-only (not in the ZIP)
 
 The parent folder is still `student_machine`. ZIP/7z export is written **next to** `machines/` (not inside the lab folder) and contains `student_machine_logs/`, `_screenshots/`, `_notes/` (notes.md + evidence.md), `_report/`, `_files_given/`. `machine_json/` is omitted.
 
+**Rename a machine:** the GUI label comes from
+`machines/<folder>/machine_json/metadata.json` (`machine_name`), not from
+the folder name alone. Stop `./htb`, edit that field (and
+`research_manifest.json` if present), optionally rename the folder to
+`student_newname`, then start again and **Open selected lab**. CLI option
+**14** can rename and move the folder.
+
 GUI sections:
 
 | Tab | Job |
@@ -157,6 +164,8 @@ python3 htb_app_lib/htb_helper.py --check
 Menu **14** shows the current machine name and workspace, lets you rename
 this lab (machine / IP / port), switch to an existing folder under
 `machines/`, or start a **new** machine (new workspace; the old one stays).
+Renaming only the `machines/` folder does not update the GUI until
+`machine_json/metadata.json` is edited (or you use this menu).
 While a logged session is active, workspace moves are blocked until you
 exit the menu and run `./htb --cli` again.
 
