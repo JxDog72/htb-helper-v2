@@ -385,24 +385,28 @@ def list_workspace_files():
 
 
 def unique_capture_path(prefix: str, suffix: str = ".txt"):
-    """Next unused name: nmap_1.txt, nmap_2.txt, … counted from files already in logs/."""
+    """logs/nmap_20260828_104015_1.txt — timestamp plus a run number that only
+    advances when a file is actually written (not on each keystroke in preview)."""
     ws = STATE["workspace"]
     if not ws:
         raise RuntimeError("Workspace is not configured yet.")
     logs = engine.logs_dir(ws)
     logs.mkdir(parents=True, exist_ok=True)
     stem = engine.safe_filename(prefix) or "tool"
-    pattern = re.compile(r"^" + re.escape(stem) + r"_(\d+)" + re.escape(suffix) + r"$")
+    pattern = re.compile(
+        r"^" + re.escape(stem) + r"(?:_\d{8}_\d{6})?_(\d+)" + re.escape(suffix) + r"$"
+    )
     highest = 0
     for path in logs.iterdir():
         match = pattern.match(path.name)
         if match:
             highest = max(highest, int(match.group(1)))
     number = highest + 1
-    dest = logs / f"{stem}_{number}{suffix}"
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    dest = logs / f"{stem}_{stamp}_{number}{suffix}"
     while dest.exists():
         number += 1
-        dest = logs / f"{stem}_{number}{suffix}"
+        dest = logs / f"{stem}_{stamp}_{number}{suffix}"
     return dest
 
 
