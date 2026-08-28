@@ -384,26 +384,26 @@ def list_workspace_files():
     return rows
 
 
-_capture_seq = 0
-
-
 def unique_capture_path(prefix: str, suffix: str = ".txt"):
-    """Never reuse an existing capture name, even in the same second."""
-    global _capture_seq
+    """Next unused name: nmap_1.txt, nmap_2.txt, … counted from files already in logs/."""
     ws = STATE["workspace"]
     if not ws:
         raise RuntimeError("Workspace is not configured yet.")
     logs = engine.logs_dir(ws)
     logs.mkdir(parents=True, exist_ok=True)
-    _capture_seq += 1
-    stamp = time.strftime("%Y%m%d_%H%M%S") + f"_{_capture_seq:04d}"
-    base = f"{engine.safe_filename(prefix)}_{stamp}"
-    path = logs / f"{base}{suffix}"
-    number = 2
-    while path.exists():
-        path = logs / f"{base}_{number}{suffix}"
+    stem = engine.safe_filename(prefix) or "tool"
+    pattern = re.compile(r"^" + re.escape(stem) + r"_(\d+)" + re.escape(suffix) + r"$")
+    highest = 0
+    for path in logs.iterdir():
+        match = pattern.match(path.name)
+        if match:
+            highest = max(highest, int(match.group(1)))
+    number = highest + 1
+    dest = logs / f"{stem}_{number}{suffix}"
+    while dest.exists():
         number += 1
-    return path
+        dest = logs / f"{stem}_{number}{suffix}"
+    return dest
 
 
 def retarget_nmap_on(command, nmap_file: Path):
@@ -1642,6 +1642,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"error": "A short reason/goal is required."}, 400)
             return
         command = resolve_run_command(tool, fields, data)
+        if command and Path(command[0]).name.lower().startswith("nmap"):
+            command = retarget_nmap_on(command, unique_capture_path("nmap_scan", ".nmap"))
         description = tool.get("name") or command[0]
 
         if not STATE["tool_lock"].acquire(blocking=False):
