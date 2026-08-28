@@ -97,11 +97,16 @@ def save_config(path: Path, config: dict):
     path.write_text(json.dumps(config, indent=4) + "\n", encoding="utf-8")
 
 
-def apply_config(config, config_path: Path):
+def apply_config(config, config_path: Path, workspace=None):
     STATE["config"] = config
     STATE["config_path"] = config_path
     if is_configured(config):
-        STATE["workspace"] = engine.setup_workspace(config)
+        STATE["workspace"] = engine.setup_workspace(config, workspace=workspace)
+        if STATE["workspace"] is not None:
+            config = dict(config)
+            config["lab_folder"] = STATE["workspace"].name
+            STATE["config"] = config
+            save_config(config_path, config)
         STATE["configured_event"].set()
     else:
         STATE["workspace"] = None
@@ -159,9 +164,10 @@ def select_lab(folder_name: str):
             prev.get("research_project", "HTB Enterprise AI Generated Pentest Report Study"),
         ),
         "gui_port": prev.get("gui_port", DEFAULT_PORT),
+        "lab_folder": folder.name,
     }
     save_config(STATE["config_path"], config)
-    apply_config(config, STATE["config_path"])
+    apply_config(config, STATE["config_path"], workspace=folder)
     return config
 
 
@@ -1407,6 +1413,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not engine.validate_config(config) or not is_configured(config):
                     self._json({"error": "Invalid configuration. Check student id, machine name, and target IP."}, 400)
                     return
+                config.pop("lab_folder", None)
                 save_config(STATE["config_path"], config)
                 apply_config(config, STATE["config_path"])
                 STATE["session_ready"].set()

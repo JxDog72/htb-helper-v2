@@ -381,9 +381,9 @@ git pull
             <li>Stop the helper (<code>exit</code>, then Ctrl+C).</li>
             <li>Open <code>machines/&lt;student&gt;_&lt;oldname&gt;/machine_json/metadata.json</code> and set <code>"machine_name"</code> (same file can change <code>target_ip</code> / <code>assigned_port</code>).</li>
             <li>Optional: rename the folder to <code>student_newname</code> so it matches. Also set <code>"machine_name"</code> in <code>research_manifest.json</code> if that file exists.</li>
-            <li>Start <code>./htb</code> again and <strong>Open selected lab</strong> (or Switch lab) so the GUI reloads.</li>
+            <li>Start <code>./htb</code> again and <strong>Open selected lab</strong> on that <em>same</em> folder (the one that still has your <code>logs/</code>). Do not Create workspace — that would make an empty new folder.</li>
           </ol>
-          <p><code>./htb --cli</code> option <strong>14</strong> can rename the current lab and move the folder for you.</p>
+          <p>If an empty <code>student_newname</code> folder appeared, that was the helper following the new name. You can delete the empty one. <code>./htb --cli</code> option <strong>14</strong> can rename the current lab and move the folder (keeping files) for you.</p>
 
           <h3>Export ZIP / 7z and copy off Pwnbox</h3>
           <p>Status → <strong>Create ZIP</strong> then SCP from your Windows PC (hostname + username from <strong>View instance details</strong>). <strong>No space after the colon.</strong></p>

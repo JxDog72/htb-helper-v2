@@ -82,9 +82,10 @@ The parent folder is still `student_machine`. ZIP/7z export is written **next to
 **Rename a machine:** the GUI label comes from
 `machines/<folder>/machine_json/metadata.json` (`machine_name`), not from
 the folder name alone. Stop `./htb`, edit that field (and
-`research_manifest.json` if present), optionally rename the folder to
-`student_newname`, then start again and **Open selected lab**. CLI option
-**14** can rename and move the folder.
+`research_manifest.json` if present), then start again and **Open
+selected lab** on the folder that still has your `logs/`. Do not Create
+a new workspace for the new name. CLI option **14** renames and moves
+the folder so files stay with the lab.
 
 GUI sections:
 

@@ -37,8 +37,10 @@ Check **Logs** in the GUI — those lines should appear in `session.log`.
 Renaming the folder under `machines/` does **not** change the name in the
 GUI. Stop the helper, edit
 `machines/<student>_<machine>/machine_json/metadata.json` and set
-`"machine_name"`, optionally rename the folder to match, then `./htb`
-and **Open selected lab**. Or use `./htb --cli` option **14**.
+`"machine_name"`, then `./htb` and **Open selected lab** on that same
+folder (the one that still has `logs/`). Do not click Create workspace
+or you get an empty new lab. Or use `./htb --cli` option **14**, which
+renames and moves the folder with your files.
 
 Do the rest of the lab in that terminal. Do not close it until you are
 done for the session. If it dies, run `./htb` again; it creates

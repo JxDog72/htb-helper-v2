@@ -274,7 +274,14 @@ def workspace_from_config(config):
     root = Path(config.get("workspace_root", "./machines")).expanduser()
     student_id = safe_filename(config["student_id"])
     machine_name = safe_filename(config["machine_name"])
-    return root / f"{student_id}_{machine_name}"
+    derived = root / f"{student_id}_{machine_name}"
+    raw = str(config.get("lab_folder") or "").strip()
+    if not raw:
+        return derived
+    name = Path(raw).name
+    if not name or name in (".", ".."):
+        return derived
+    return root / name
 
 
 def workspace_slug(workspace):
@@ -503,8 +510,8 @@ def update_milestone(workspace, milestone):
     save_manifest(workspace, manifest)
 
 
-def setup_workspace(config):
-    workspace = workspace_from_config(config)
+def setup_workspace(config, workspace=None):
+    workspace = Path(workspace) if workspace is not None else workspace_from_config(config)
     for folder in (
         logs_dir(workspace),
         screenshots_dir(workspace),
@@ -2582,12 +2589,18 @@ def config_from_lab(folder, previous):
             previous.get("research_project", "HTB Enterprise AI Generated Pentest Report Study"),
         ),
         "gui_port": previous.get("gui_port", 8765),
+        "lab_folder": Path(folder).name,
     }
 
 
 def apply_cli_config(config, workspace, config_path, *, old_name=None, renamed_from=None):
+    if workspace is not None:
+        config = dict(config)
+        config["lab_folder"] = Path(workspace).name
     save_config(config_path, config)
-    workspace = setup_workspace(config)
+    workspace = setup_workspace(config, workspace=workspace)
+    config["lab_folder"] = Path(workspace).name
+    save_config(config_path, config)
     write_lab_metadata(workspace, config)
     if old_name:
         refresh_notes_machine_header(workspace, old_name, config)
@@ -2674,6 +2687,7 @@ def start_new_machine(config, workspace, config_path, session_active=False):
     target = prompt_line("Target IP", "")
     port = prompt_port(None)
     updated = dict(config)
+    updated.pop("lab_folder", None)
     updated["student_id"] = student
     updated["machine_name"] = machine
     updated["target_ip"] = target
