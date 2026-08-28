@@ -20,7 +20,7 @@ are supported with the same GUI.
 
 No pip packages. Python 3.9+ standard library only.
 
-**License:** [MIT](LICENSE). GitHub will show “MIT license” on the repo.
+**License:** [MIT](LICENSE). MIT license
 This is a study aid for **authorized HTB Enterprise labs only**. The
 author is **not responsible** for damage, data loss, misuse, or attacks.
 You are solely responsible for staying in scope and following HTB rules
