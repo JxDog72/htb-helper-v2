@@ -384,6 +384,52 @@ def list_workspace_files():
     return rows
 
 
+_capture_seq = 0
+
+
+def unique_capture_path(prefix: str, suffix: str = ".txt"):
+    """Never reuse an existing capture name, even in the same second."""
+    global _capture_seq
+    ws = STATE["workspace"]
+    if not ws:
+        raise RuntimeError("Workspace is not configured yet.")
+    logs = engine.logs_dir(ws)
+    logs.mkdir(parents=True, exist_ok=True)
+    _capture_seq += 1
+    stamp = time.strftime("%Y%m%d_%H%M%S") + f"_{_capture_seq:04d}"
+    base = f"{engine.safe_filename(prefix)}_{stamp}"
+    path = logs / f"{base}{suffix}"
+    number = 2
+    while path.exists():
+        path = logs / f"{base}_{number}{suffix}"
+        number += 1
+    return path
+
+
+def retarget_nmap_on(command, nmap_file: Path):
+    command = list(command)
+    nmap_path = str(nmap_file)
+    if "-oN" in command:
+        index = command.index("-oN")
+        if index + 1 < len(command):
+            command[index + 1] = nmap_path
+        else:
+            command.append(nmap_path)
+        return command
+    if command:
+        return command[:-1] + ["-oN", nmap_path, command[-1]]
+    return ["nmap", "-oN", nmap_path]
+
+
+def tee_command(cmd: str, rel: str):
+    text = str(cmd or "").rstrip()
+    if not text:
+        return text
+    if "| tee " in text or text.endswith("| tee"):
+        return text
+    return f'{text} | tee "{rel}"'
+
+
 def log_files():
     ws = STATE["workspace"]
     if not ws:
@@ -576,18 +622,14 @@ def build_command(tool, fields, extra, config):
         return shlex.split(command_text) + extra_parts
 
     if kind in ("nmap", "nmap-port"):
-        ws = STATE["workspace"]
-        stamp = engine.timestamp_seconds()
-        logs = engine.logs_dir(ws)
-        logs.mkdir(parents=True, exist_ok=True)
         nmap_args = list(tool.get("nmap_args") or [])
         full_tcp = "-p-" in nmap_args
         if kind == "nmap-port" and port is None:
             raise RuntimeError("Set a port for this scan (lab assigned port, or another port you found).")
         if kind == "nmap-port" or (port and not full_tcp):
-            nmap_file = logs / f"nmap_port_{port}_{stamp}.nmap"
+            nmap_file = unique_capture_path(f"nmap_port_{port}", ".nmap")
         else:
-            nmap_file = logs / f"nmap_scan_{stamp}.nmap"
+            nmap_file = unique_capture_path("nmap_scan", ".nmap")
         command = ["nmap"] + nmap_args
         # nmap -p- must stay all TCP ports. Assigned lab port is only used
         # for "Nmap assigned port", or if the student typed a Port on a
@@ -1025,7 +1067,7 @@ def next_spawned_session_log(workspace):
     number = 2
     while (logs / f"terminal{number}_session.log").exists():
         number += 1
-    return logs / f"terminal{number}_session.log"
+    return (logs / f"terminal{number}_session.log").resolve()
 
 
 def spawn_logged_terminal():
@@ -1077,6 +1119,66 @@ def spawn_logged_terminal():
         except OSError as exc:
             last_err = str(exc)
     raise RuntimeError(last_err)
+
+
+def prepare_terminal_send(data):
+    """Unique .txt (and .nmap) plus optional notes, then a line to type into the shell."""
+    ws = STATE["workspace"]
+    if not ws or not is_configured(STATE["config"]):
+        raise RuntimeError("Pick or create a lab first.")
+    command_text = str(data.get("command") or "").strip()
+    tool = None
+    fields = {}
+    if data.get("id"):
+        try:
+            tool, fields = collect_tool_fields(data)
+        except Exception:
+            tool, fields = None, {}
+        if not command_text:
+            built = resolve_run_command(tool, fields, data)
+            command_text = format_command(built)
+    if not command_text:
+        raise RuntimeError("Command is empty.")
+    label = "command"
+    if tool:
+        label = tool.get("bin") or tool.get("id") or label
+    else:
+        first = command_text.split()[0] if command_text.split() else "command"
+        label = Path(first).name
+    if "nmap" in label.lower() or command_text.lower().startswith("nmap "):
+        nmap_file = unique_capture_path("nmap_scan", ".nmap")
+        try:
+            parts = shlex.split(command_text, posix=(os.name != "nt"))
+            command_text = format_command(retarget_nmap_on(parts, nmap_file))
+        except ValueError:
+            pass
+    out = unique_capture_path(label, ".txt")
+    rel = engine.relative_path(ws, out)
+    send = tee_command(command_text, rel)
+    include_notes = data.get("include_notes") in (True, "yes", "true", 1, "1")
+    notes_text = None
+    if include_notes:
+        purpose = str(data.get("purpose") or "").strip() or "Sent to the logged terminal."
+        description = (tool or {}).get("name") or label
+        with STATE["notes_lock"]:
+            engine.append_timeline_note(
+                ws,
+                "TOOL",
+                f"Sent to terminal ({description}). Output: {rel}",
+                tool=label,
+                command=send,
+                purpose=purpose,
+                evidence=[rel],
+            )
+        notes_text = read_notes()
+    return {
+        "ok": True,
+        "send_command": send,
+        "command": command_text,
+        "output_file": rel,
+        "copy_command": send,
+        "notes": notes_text,
+    }
 
 
 def tools_public():
@@ -1471,14 +1573,12 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/tools/inject":
-                command = str(data.get("command") or "").strip()
-                if not command:
-                    raise RuntimeError("Command is empty.")
+                payload = prepare_terminal_send(data)
                 if not STATE["session_active"]:
                     raise RuntimeError("No live session. Start with ./htb (not --gui-only), then Send to terminal.")
-                if not inject_to_session(command):
+                if not inject_to_session(payload["send_command"]):
                     raise RuntimeError("Could not type into the logged terminal.")
-                self._json({"ok": True})
+                self._json(payload)
                 return
 
             if path == "/api/session":
@@ -1511,17 +1611,14 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/tools/preview":
                 tool, fields = collect_tool_fields(data)
                 command = build_command(tool, fields, data.get("extra") or "", STATE["config"])
-                cmd = format_command(command)
-                ws = STATE["workspace"]
-                logs = engine.logs_dir(ws)
-                logs.mkdir(parents=True, exist_ok=True)
                 label = tool.get("bin") or tool.get("id") or command[0]
-                out = logs / f"{engine.safe_filename(label)}_{engine.timestamp_seconds()}.txt"
-                rel = engine.relative_path(ws, out)
+                out = unique_capture_path(label, ".txt")
+                rel = engine.relative_path(STATE["workspace"], out)
+                cmd = format_command(command)
                 self._json({
                     "command": cmd,
                     "output_file": rel,
-                    "copy_command": f'{cmd} | tee "{rel}"',
+                    "copy_command": tee_command(cmd, rel),
                 })
                 return
 
@@ -1567,9 +1664,7 @@ class Handler(BaseHTTPRequestHandler):
             ws = STATE["workspace"]
             identified = engine.identify_tool(command)
             tool_label = identified if identified != "generic" else Path(command[0]).name
-            logs = engine.logs_dir(ws)
-            logs.mkdir(parents=True, exist_ok=True)
-            output_file = logs / f"{engine.safe_filename(tool_label)}_{engine.timestamp_seconds()}.txt"
+            output_file = unique_capture_path(tool_label, ".txt")
             rel = engine.relative_path(ws, output_file)
             emit({
                 "type": "command",
@@ -1713,6 +1808,8 @@ def main():
 
     if args.logged_shell:
         log_path = Path(args.logged_shell).expanduser()
+        if not log_path.is_absolute():
+            log_path = (ROOT / log_path).resolve()
         if STATE["workspace"]:
             os.chdir(STATE["workspace"])
         print(f"[+] Extra terminal log: {log_path}")

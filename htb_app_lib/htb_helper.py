@@ -580,13 +580,6 @@ def setup_workspace(config):
             "Each evidence item points to an original artifact in the workspace.\n",
             encoding="utf-8",
         )
-    given = files_given_dir(workspace) / "README.txt"
-    if not given.exists():
-        given.write_text(
-            "Include any files you were given for this lab\n",
-            encoding="utf-8",
-        )
-
     report_path = report_file(workspace)
     if not report_path.exists():
         report_path.write_text(default_report_text(config), encoding="utf-8")

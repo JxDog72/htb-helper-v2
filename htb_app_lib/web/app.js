@@ -799,12 +799,27 @@
         return;
       }
       try {
-        await api("/api/tools/inject", {
+        const data = await api("/api/tools/inject", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ command: cmd }),
+          body: JSON.stringify({
+            id: state.currentTool ? state.currentTool.id : "",
+            purpose: $("tool-purpose").value,
+            extra: $("tool-extra").value,
+            fields: toolFields(),
+            command: cmd,
+            command_edited: state.cmdDirty,
+            include_notes: $("tool-notes").value === "yes",
+          }),
         });
-        $("tool-out").textContent += "\n[sent to logged terminal]\n" + cmd + "\n";
+        if (data.copy_command) $("tool-copy").value = data.copy_command;
+        if (data.output_file) {
+          state.lastOutFile = data.output_file;
+          $("tool-cmd-preview").textContent = "saves " + data.output_file;
+        }
+        if (data.notes != null) applyNotesText(data.notes);
+        $("tool-out").textContent += "\n[sent to logged terminal]\n" + (data.send_command || cmd) + "\n";
+        if (data.output_file) $("tool-out").textContent += "[capture] " + data.output_file + "\n";
         $("tool-out").scrollTop = $("tool-out").scrollHeight;
       } catch (err) {
         alert(err.message);
