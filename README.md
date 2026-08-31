@@ -26,11 +26,11 @@ author is **not responsible** for damage, data loss, misuse, or attacks.
 You are solely responsible for staying in scope and following HTB rules
 and the law.
 
-![Notes view](screenshots/mainNotes.png)
+![Notes view](https://raw.githubusercontent.com/JxDog72/htb-helper-v2/screenshots/mainNotes.png)
 
-![Tools](screenshots/toolUse.png)
+![Tools](https://raw.githubusercontent.com/JxDog72/htb-helper-v2/screenshots/toolUse.png)
 
-![Evidence log](screenshots/Evidence.png)
+![Evidence log](https://raw.githubusercontent.com/JxDog72/htb-helper-v2/screenshots/Evidence.png)
 
 ---
 

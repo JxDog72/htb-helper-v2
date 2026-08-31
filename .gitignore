@@ -4,6 +4,10 @@ config.json
 
 # Collected research data (session logs, screenshots, notes, evidence).
 machines/
+
+# Promo shots live on the `screenshots` git branch for the GitHub README only.
+# They are not part of a normal clone or install.
+/screenshots/
 *.log
 
 # Backup archives created by the helper.
