@@ -26,6 +26,12 @@ author is **not responsible** for damage, data loss, misuse, or attacks.
 You are solely responsible for staying in scope and following HTB rules
 and the law.
 
+![Notes view](screenshots/mainNotes.png)
+
+![Tools](screenshots/toolUse.png)
+
+![Evidence log](screenshots/Evidence.png)
+
 ---
 
 ## Fresh Parrot (or Kali) VM
