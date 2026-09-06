@@ -200,6 +200,13 @@ kbd {
 .meta-block dd { margin: 0 0 0.5rem; font-family: var(--font-mono); }
 .check { display: flex; gap: 0.4rem; align-items: center; color: var(--quiet); }
 label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.82rem; color: var(--quiet); }
+.notes-opts {
+  display: flex; flex-direction: column; gap: 0.35rem;
+  padding: 0.45rem 0.6rem; border: 1px dashed var(--rule); background: #16130f;
+}
+#tool-wordlist { font-family: var(--font-mono); font-size: 0.8rem; }
+#tool-wordlist-custom { font-family: var(--font-mono); font-size: 0.8rem; margin-top: 0.35rem; }
+.info-card ul li { margin: 0.12rem 0; }
 
 .overlay {
   position: fixed; inset: 0; background: rgba(8,6,4,0.82);

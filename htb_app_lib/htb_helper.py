@@ -636,6 +636,8 @@ def append_timeline_note(
     exit_code=None,
     metadata=None,
     compact=False,
+    include_command=True,
+    include_findings=True,
 ):
     """Append a factual timestamped note and mirror it into the manifest."""
     note_time = human_timestamp()
@@ -649,7 +651,10 @@ def append_timeline_note(
         purpose = sanitize_note_text(purpose, 700) if purpose else None
         outcome = sanitize_note_text(outcome, 700) if outcome else None
     tool = None if compact else (sanitize_note_text(tool, 100) if tool else None)
-    command = None if compact else (sanitize_note_text(command, 1500) if command else None)
+    if compact or not include_command:
+        command = None
+    else:
+        command = sanitize_note_text(command, 1500) if command else None
     if compact:
         purpose = None
         outcome = None
@@ -657,15 +662,19 @@ def append_timeline_note(
         evidence = None
         findings = None
         exit_code = None
+        include_findings = False
     else:
         origin_write = True
 
     clean_findings = []
-    for finding in findings or []:
-        cleaned = sanitize_note_text(finding, 700)
-        if cleaned:
-            clean_findings.append(cleaned)
-    clean_findings = unique_preserve(clean_findings)[:MAX_NOTE_FINDINGS]
+    if include_findings:
+        for finding in findings or []:
+            cleaned = sanitize_note_text(finding, 700)
+            if cleaned:
+                clean_findings.append(cleaned)
+        clean_findings = unique_preserve(clean_findings)[:MAX_NOTE_FINDINGS]
+    else:
+        findings = None
 
     clean_evidence = []
     for item in evidence or []:
@@ -686,7 +695,19 @@ def append_timeline_note(
             handle.write(f"{stamp} {tool}\n")
             if command:
                 handle.write(f"- Command: `{command}`\n")
-            handle.write("- Summary: \n")
+            if purpose:
+                handle.write(f"- Why: {purpose}\n")
+            if include_findings:
+                if summary:
+                    handle.write(f"- Summary: {summary}\n")
+                if clean_findings:
+                    handle.write("- Findings:\n")
+                    for finding in clean_findings:
+                        handle.write(f"  - {finding}\n")
+            if clean_evidence:
+                handle.write(f"- Output: {', '.join(clean_evidence)}\n")
+            if exit_code is not None:
+                handle.write(f"- Exit: {exit_code}\n")
 
     manifest_add(workspace, "notes", {
         "time": note_time,
@@ -819,6 +840,9 @@ TOOL_ALIASES = {
     "cme": "netexec",
     "curl": "curl",
     "wget": "wget",
+    "sqlmap": "sqlmap",
+    "sqlmap.py": "sqlmap",
+    "dalfox": "dalfox",
 }
 
 TOOL_CATEGORIES = {
@@ -840,6 +864,8 @@ TOOL_CATEGORIES = {
     "netexec": "ENUMERATION",
     "curl": "ENUMERATION",
     "wget": "ENUMERATION",
+    "sqlmap": "ENUMERATION",
+    "dalfox": "ENUMERATION",
     "generic": "OTHER",
 }
 
@@ -1110,6 +1136,27 @@ def parse_http_headers_output(output):
     return unique_preserve(results)
 
 
+def parse_sqlmap_output(output):
+    results = []
+    for line in output.splitlines():
+        stripped = line.strip()
+        if re.search(r"(?i)(injectable|injection point|back-end DBMS|available databases|fetched data|Parameter:)", stripped):
+            results.append(sanitize_note_text(stripped.lstrip("[*] ").lstrip("[+] "), 600))
+        elif re.match(r"^\[?['\"]?\w", stripped) and "database" in output.lower() and len(stripped) < 80:
+            if re.match(r"^[*+\-]\s+\S+", stripped) or stripped.startswith("[*]"):
+                results.append(sanitize_note_text(stripped, 400))
+    return unique_preserve(results)[:MAX_NOTE_FINDINGS]
+
+
+def parse_dalfox_output(output):
+    results = []
+    for line in output.splitlines():
+        stripped = line.strip()
+        if re.search(r"(?i)(\[V\]|POC|reflected|verified|vulnerable|payload)", stripped):
+            results.append(sanitize_note_text(stripped, 600))
+    return unique_preserve(results)[:MAX_NOTE_FINDINGS]
+
+
 def analyze_tool_output(tool, output, returncode):
     """Generate a conservative summary. Never claim exploitation success."""
     nonempty_lines = [line for line in output.splitlines() if line.strip()]
@@ -1147,6 +1194,8 @@ def analyze_tool_output(tool, output, returncode):
         "ldapsearch": parse_ldap_output,
         "curl": parse_http_headers_output,
         "wget": parse_http_headers_output,
+        "sqlmap": parse_sqlmap_output,
+        "dalfox": parse_dalfox_output,
     }
 
     parser = parser_map.get(tool)
@@ -1580,8 +1629,10 @@ def run_nmap(workspace, target, port=None, scan_args=None, description=None):
         label = description or "Nmap reconnaissance"
 
     command = ["nmap"]
-    if scan_args:
-        command.extend(scan_args)
+    args = list(scan_args or [])
+    if "-Pn" not in args:
+        args = ["-Pn"] + args
+    command.extend(args)
     if port:
         command.extend(["-p", str(port)])
     command.extend(["-oN", f"{output_prefix}.nmap", target])
@@ -2788,7 +2839,7 @@ def interactive_mode(config, workspace, config_path, session_active=False):
             run_nmap(
                 workspace,
                 config["target_ip"],
-                scan_args=["-sV"],
+                scan_args=["-Pn", "-sV"],
                 description="Nmap service/version reconnaissance",
             )
 
@@ -2801,7 +2852,7 @@ def interactive_mode(config, workspace, config_path, session_active=False):
                     workspace,
                     config["target_ip"],
                     port=port,
-                    scan_args=["-sV"],
+                    scan_args=["-Pn", "-sV"],
                     description=f"Nmap assigned-port service/version scan ({port})",
                 )
 

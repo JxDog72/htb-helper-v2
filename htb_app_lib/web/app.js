@@ -322,7 +322,7 @@
     const groups = infoCache.groups.filter((_, i) => i === infoGroup);
     $("info-groups").innerHTML = groups.map((g) => {
       const tools = g.tools.filter((t) => {
-        const blob = `${t.name} ${t.bin} ${t.blurb} ${t.syntax}`.toLowerCase();
+        const blob = `${t.name} ${t.bin} ${t.blurb} ${t.syntax} ${(t.options || []).join(" ")} ${(t.examples || []).join(" ")}`.toLowerCase();
         return !q || blob.includes(q);
       });
       if (!tools.length) return `<p class="quiet">No tools in this group match the filter.</p>`;
@@ -388,18 +388,25 @@
     const lists = state.tools.wordlists || [];
     fields.innerHTML = (found.fields || []).map((f) => {
       let def = f.default || "";
-      if (f.name === "wordlist" && !def && lists[0]) def = lists[0];
       if (def.includes("{target}") && state.tools.target) def = def.replaceAll("{target}", state.tools.target);
-      const list = f.name === "wordlist"
-        ? ` list="wl" /><datalist id="wl">${lists.map((w) => `<option value="${escapeHtml(w)}">`).join("")}</datalist`
-        : "";
-      return `<label>${escapeHtml(f.label)}<input data-field="${escapeHtml(f.name)}" value="${escapeHtml(def)}"${list}></label>`;
+      if (f.name === "wordlist") {
+        if (def && lists.indexOf(def) === -1 && !lists.some((w) => w.replace(/\\/g, "/") === def.replace(/\\/g, "/"))) {
+          const match = lists.find((w) => w.endsWith(def.replace(/\\/g, "/").split("/").pop()));
+          def = match || lists[0] || "";
+        } else if (!def && lists[0]) {
+          def = lists[0];
+        }
+        return `<label>${escapeHtml(f.label)}${wordlistSelectHtml(lists, def)}</label>`;
+      }
+      return `<label>${escapeHtml(f.label)}<input data-field="${escapeHtml(f.name)}" value="${escapeHtml(def)}"></label>`;
     }).join("");
+    bindWordlistSelect();
     $("tool-out").textContent = "";
     $("tool-cmd-preview").textContent = "";
     $("tool-copy").value = "";
     $("tool-extra").value = "";
-    $("tool-notes").value = "no";
+    if ($("tool-notes")) $("tool-notes").checked = false;
+    syncNotesOptions();
     if (found.kind === "custom") {
       $("tool-cmd").value = "";
       $("tool-copy").value = "";
@@ -411,14 +418,82 @@
     previewCommand(true);
   }
 
+  function wordlistLabel(path) {
+    const parts = String(path).replace(/\\/g, "/").split("/");
+    if (parts.length >= 2) return parts.slice(-2).join("/");
+    return path;
+  }
+
+  function wordlistSelectHtml(lists, selected) {
+    if (!lists.length) {
+      return `<select data-field="wordlist" id="tool-wordlist">
+        <option value="__custom__" selected>Custom path…</option>
+      </select>
+      <input data-field="wordlist_custom" id="tool-wordlist-custom" placeholder="/path/to/wordlist.txt">`;
+    }
+    const groups = new Map();
+    for (const w of lists) {
+      const norm = String(w).replace(/\\/g, "/");
+      const slash = norm.lastIndexOf("/");
+      const group = slash > 0 ? norm.slice(0, slash) : "Other";
+      if (!groups.has(group)) groups.set(group, []);
+      groups.get(group).push(w);
+    }
+    let html = `<select data-field="wordlist" id="tool-wordlist">`;
+    for (const [group, items] of groups) {
+      const gLabel = group.replace(/\\/g, "/").split("/").slice(-3).join("/");
+      html += `<optgroup label="${escapeHtml(gLabel)}">`;
+      for (const w of items) {
+        const sel = w === selected ? " selected" : "";
+        html += `<option value="${escapeHtml(w)}"${sel}>${escapeHtml(wordlistLabel(w))}</option>`;
+      }
+      html += `</optgroup>`;
+    }
+    html += `<option value="__custom__">Custom path…</option></select>
+      <input data-field="wordlist_custom" id="tool-wordlist-custom" class="hidden" placeholder="/path/to/wordlist.txt">`;
+    return html;
+  }
+
+  function bindWordlistSelect() {
+    const sel = $("tool-wordlist");
+    const custom = $("tool-wordlist-custom");
+    if (!sel || !custom) return;
+    const toggle = () => {
+      const isCustom = sel.value === "__custom__";
+      custom.classList.toggle("hidden", !isCustom);
+      if (isCustom) custom.focus();
+    };
+    sel.addEventListener("change", toggle);
+    toggle();
+  }
+
   function toolFields() {
     const fields = {};
     $("tool-fields").querySelectorAll("[data-field]").forEach((el) => {
       fields[el.getAttribute("data-field")] = el.value;
     });
+    if (fields.wordlist === "__custom__") {
+      fields.wordlist = (fields.wordlist_custom || "").trim();
+    }
+    delete fields.wordlist_custom;
     fields.target = $("tool-target").value.trim();
     fields.port = $("tool-port").value.trim();
     return fields;
+  }
+
+  function notesIncludePayload() {
+    const include = !!($("tool-notes") && $("tool-notes").checked);
+    return {
+      include_notes: include,
+      include_command: !!(include && $("tool-notes-cmd") && $("tool-notes-cmd").checked),
+      include_findings: !!(include && $("tool-notes-findings") && $("tool-notes-findings").checked),
+    };
+  }
+
+  function syncNotesOptions() {
+    const extra = $("tool-notes-extra");
+    if (!extra || !$("tool-notes")) return;
+    extra.classList.toggle("hidden", !$("tool-notes").checked);
   }
 
   function setToolRunning(running) {
@@ -474,7 +549,7 @@
       fields: toolFields(),
       command: $("tool-cmd").value,
       command_edited: state.cmdDirty,
-      include_notes: $("tool-notes").value === "yes",
+      ...notesIncludePayload(),
     };
     $("tool-out").textContent = "";
     setToolRunning(true);
@@ -792,6 +867,9 @@
       state.cmdDirty = false;
       previewCommand(true).catch(() => {});
     });
+    if ($("tool-notes")) {
+      $("tool-notes").addEventListener("change", syncNotesOptions);
+    }
     $("btn-tool-send").addEventListener("click", async () => {
       const cmd = ($("tool-cmd").value || "").trim();
       if (!cmd) {
@@ -809,7 +887,7 @@
             fields: toolFields(),
             command: cmd,
             command_edited: state.cmdDirty,
-            include_notes: $("tool-notes").value === "yes",
+            ...notesIncludePayload(),
           }),
         });
         if (data.copy_command) $("tool-copy").value = data.copy_command;
@@ -829,7 +907,7 @@
       if (state.applyingPreview) return;
       const id = e.target && e.target.id;
       const isField = e.target && e.target.hasAttribute && e.target.hasAttribute("data-field");
-      if (id === "tool-purpose" || id === "tool-notes") return;
+      if (id === "tool-purpose" || id === "tool-notes" || id === "tool-notes-cmd" || id === "tool-notes-findings") return;
       if (id === "tool-copy") return;
       if (id === "tool-cmd") {
         state.cmdDirty = true;

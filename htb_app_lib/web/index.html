@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=16" />
+  <link rel="stylesheet" href="/app.css?v=17" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c9843a'/></svg>" />
 </head>
 <body>
@@ -161,12 +161,12 @@
               <label>Copy for your own terminal (saves .txt)
                 <textarea id="tool-copy" rows="2" spellcheck="false" placeholder="Updates when you change IP/port. Edit if you want."></textarea>
               </label>
-              <label>Include tool use in notes.md
-                <select id="tool-notes">
-                  <option value="no" selected>No</option>
-                  <option value="yes">Include tool use in notes.md</option>
-                </select>
-              </label>
+              <label class="check"><input type="checkbox" id="tool-notes" /> Include tool use in notes.md</label>
+              <div id="tool-notes-extra" class="notes-opts hidden">
+                <label class="check"><input type="checkbox" id="tool-notes-cmd" checked /> Include full command syntax</label>
+                <label class="check"><input type="checkbox" id="tool-notes-findings" checked /> Include summary of findings</label>
+                <p class="quiet">Command is the exact line that ran. Findings are the parser summary (open ports, paths, injection points) — not a full dump of the capture file.</p>
+              </div>
               <div class="row wrap">
                 <button type="button" class="btn copper" id="btn-tool-send">Send to terminal</button>
                 <button type="submit" class="btn ghost" id="btn-tool-run">Run and capture</button>
@@ -182,8 +182,8 @@
 
       <section id="tab-info" class="tab">
         <div class="row wrap">
-          <input id="info-search" type="search" placeholder="Filter tools (nmap, ffuf, nxc…)" />
-          <span class="quiet">Cheat sheet only — running a tool is on the Tools tab. Syntax uses the configured target as $TARGET.</span>
+          <input id="info-search" type="search" placeholder="Filter tools (nmap, sqlmap, xss…)" />
+          <span class="quiet">Cheat sheet only — running a tool is on the Tools tab. Syntax uses the configured target as $TARGET. XSS / SQL injection is its own category.</span>
         </div>
         <nav class="tool-nav" id="info-nav" aria-label="Tool info categories"></nav>
         <div id="info-groups" class="info-groups"></div>
@@ -391,10 +391,13 @@ git pull
           <p>Encrypted <strong>7z is not SCP</strong>. Create it on Status, then share with <a href="https://wormhole.app" target="_blank" rel="noopener">wormhole.app</a> for one download. Own VM: shared folder or drag-and-drop.</p>
 
           <h3>Tools IP / port stuck?</h3>
-          <p>Lab identity is only the default. On the Tools form, change <strong>Target IP</strong> and <strong>Port</strong> for that run. <strong>Nmap all TCP ports</strong> is <code>nmap -p- -sV</code> and ignores the assigned lab port. <strong>Send to terminal</strong> types the command into the logged shell. <strong>Run and capture</strong> runs it from the GUI (output is also appended to session.log). Custom: type the command in the Command box only.</p>
+          <p>Lab identity is only the default. On the Tools form, change <strong>Target IP</strong> and <strong>Port</strong> for that run. Every nmap button includes <code>-Pn</code> (skip host discovery) because HTB boxes often drop ICMP — without it nmap says the host is down and scans nothing. <strong>Nmap all TCP ports</strong> is <code>nmap -Pn -p- -sV</code> and ignores the assigned lab port. Wordlist tools (gobuster, ffuf, feroxbuster, SQLi/XSS fuzz) use a dropdown of lists installed on the box. <strong>Send to terminal</strong> types the command into the logged shell. <strong>Run and capture</strong> runs it from the GUI (output is also appended to session.log). Custom: type the command in the Command box only.</p>
 
           <h3>Nmap files</h3>
-          <p>Each helper nmap run keeps a streamed <code>.txt</code> and nmap’s own <code>.nmap</code>. No xml/gnmap.</p>
+          <p>Each helper nmap run keeps a streamed <code>.txt</code> and nmap’s own <code>.nmap</code>. No xml/gnmap. Flags like <code>-Pn</code>, <code>-sC</code>, <code>-sS</code>, <code>-A</code>, and <code>--script vuln</code> are on the Tools tab and explained under Tool Info → Network.</p>
+
+          <h3>XSS / SQL injection</h3>
+          <p>Tools tab category <strong>6. XSS / SQL injection</strong> has sqlmap, ffuf wordlist fuzz, curl probes, and dalfox. Tool Info has the cheat sheet (error/boolean/UNION/time-based SQLi, reflected/stored/DOM XSS). Authorized HTB labs only. Check <strong>Include tool use in notes.md</strong> then pick whether to stamp the full command and/or the parser summary.</p>
 
           <h3>E-ID</h3>
           <p><strong>E-001</strong> is just the next evidence number so you can cite it in the report (like a footnote ID).</p>
@@ -420,6 +423,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=25"></script>
+  <script src="/app.js?v=26"></script>
 </body>
 </html>

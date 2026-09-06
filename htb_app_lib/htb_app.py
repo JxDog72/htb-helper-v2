@@ -37,7 +37,15 @@ from session_capture import (
     session_paused,
     set_session_paused,
 )
-from tools_catalog import COMMON_WORDLISTS, TOOL_GROUPS, TOOL_INFO
+from tools_catalog import (
+    COMMON_WORDLISTS,
+    MAX_WORDLISTS,
+    TOOL_GROUPS,
+    TOOL_INFO,
+    WORDLIST_DIRS,
+    WORDLIST_EXTS,
+    WORDLIST_PRIORITY_RE,
+)
 
 LIB = Path(__file__).resolve().parent
 ROOT = LIB.parent
@@ -244,8 +252,86 @@ def try_bootstrap(packages=None):
         return {"ok": False, "installed": [], "message": str(exc)}
 
 
+_WORDLIST_CACHE = {"paths": None, "at": 0.0}
+
+
+def _truthy(value) -> bool:
+    return value in (True, "yes", "true", "on", 1, "1")
+
+
 def existing_wordlists():
-    found = [p for p in COMMON_WORDLISTS if Path(p).is_file()]
+    """Installed wordlists: well-known files first, then a scan of Kali/Parrot dirs."""
+    now = time.monotonic()
+    cached = _WORDLIST_CACHE["paths"]
+    if cached is not None and now - _WORDLIST_CACHE["at"] < 45:
+        return cached
+
+    found = []
+    seen = set()
+
+    def add(path):
+        try:
+            resolved = str(Path(path).expanduser().resolve())
+        except OSError:
+            return
+        key = resolved.lower()
+        if key in seen:
+            return
+        try:
+            if not Path(resolved).is_file():
+                return
+        except OSError:
+            return
+        seen.add(key)
+        found.append(resolved)
+
+    for item in COMMON_WORDLISTS:
+        add(item)
+
+    home = Path.home()
+    extra_dirs = [
+        home / "wordlists",
+        home / "SecLists",
+        home / "seclists",
+        Path("C:/wordlists"),
+        Path("C:/Tools/SecLists"),
+        Path("C:/Tools/wordlists"),
+    ]
+    dirs = [Path(p) for p in WORDLIST_DIRS] + extra_dirs
+    priority = re.compile(WORDLIST_PRIORITY_RE, re.I)
+    extras = []
+    for folder in dirs:
+        try:
+            if not folder.is_dir():
+                continue
+        except OSError:
+            continue
+        try:
+            for dirpath, dirnames, filenames in os.walk(folder):
+                dirnames[:] = [
+                    name for name in dirnames
+                    if name not in {".git", ".svn", "node_modules", "__pycache__"}
+                ]
+                rel_depth = Path(dirpath).relative_to(folder).parts
+                if len(rel_depth) > 5:
+                    dirnames[:] = []
+                    continue
+                for name in filenames:
+                    suffix = Path(name).suffix.lower()
+                    if suffix not in WORDLIST_EXTS:
+                        continue
+                    extras.append(str(Path(dirpath) / name))
+        except OSError:
+            continue
+
+    extras.sort(key=lambda p: (0 if priority.search(p) else 1, p.lower()))
+    for item in extras:
+        if len(found) >= MAX_WORDLISTS:
+            break
+        add(item)
+
+    _WORDLIST_CACHE["paths"] = found
+    _WORDLIST_CACHE["at"] = now
     return found
 
 
@@ -341,7 +427,7 @@ def preflight_payload():
     optional = [
         "gobuster", "ffuf", "feroxbuster", "nikto", "whatweb", "nuclei",
         "httpx", "enum4linux-ng", "enum4linux", "smbclient", "nxc",
-        "ldapsearch", "curl", "dig", "whois",
+        "ldapsearch", "curl", "dig", "whois", "sqlmap", "dalfox",
     ]
     present = [name for name in optional if shutil.which(name)]
     return {
@@ -632,6 +718,8 @@ def build_command(tool, fields, extra, config):
             nmap_file = unique_capture_path(f"nmap_port_{port}", ".nmap")
         else:
             nmap_file = unique_capture_path("nmap_scan", ".nmap")
+        if "-Pn" not in nmap_args:
+            nmap_args = ["-Pn"] + nmap_args
         command = ["nmap"] + nmap_args
         # nmap -p- must stay all TCP ports. Assigned lab port is only used
         # for "Nmap assigned port", or if the student typed a Port on a
@@ -744,7 +832,11 @@ def fill_defaults(tool, fields, config):
     for spec in tool.get("fields") or []:
         name = spec["name"]
         if not fields.get(name) and spec.get("default"):
-            fields[name] = substitute(spec["default"], fields, config)
+            value = substitute(spec["default"], fields, config)
+            if name == "wordlist" and value and not Path(value).expanduser().is_file():
+                value = ""
+            if value:
+                fields[name] = value
     if "wordlist" in [s["name"] for s in tool.get("fields") or []] and not fields.get("wordlist"):
         lists = existing_wordlists()
         if lists:
@@ -826,7 +918,17 @@ def run_tool_streaming(command, output_file, send_line):
     }
 
 
-def finish_tool_run(tool, command, purpose, description, result, output_file, include_notes=False):
+def finish_tool_run(
+    tool,
+    command,
+    purpose,
+    description,
+    result,
+    output_file,
+    include_notes=False,
+    include_command=True,
+    include_findings=True,
+):
     ws = STATE["workspace"]
     identified = engine.identify_tool(command)
     tool_label = identified if identified != "generic" else Path(command[0]).name
@@ -848,10 +950,17 @@ def finish_tool_run(tool, command, purpose, description, result, output_file, in
         with STATE["notes_lock"]:
             engine.append_timeline_note(
                 ws,
-                "TOOL",
+                category or "TOOL",
                 summary,
                 tool=tool_label,
-                command=format_command(command),
+                command=format_command(command) if include_command else None,
+                purpose=purpose,
+                outcome=outcome,
+                findings=findings if include_findings else None,
+                evidence=[rel],
+                exit_code=result["returncode"],
+                include_command=include_command,
+                include_findings=include_findings,
                 metadata={**metadata, "event": "attempt_result"},
             )
     artifact = engine.file_metadata(ws, output_file)
@@ -1168,7 +1277,9 @@ def prepare_terminal_send(data):
         purpose,
         output_file=rel,
     )
-    include_notes = data.get("include_notes") in (True, "yes", "true", 1, "1")
+    include_notes = _truthy(data.get("include_notes"))
+    include_command = _truthy(data.get("include_command")) if "include_command" in data else True
+    include_findings = _truthy(data.get("include_findings")) if "include_findings" in data else True
     notes_text = None
     if include_notes:
         with STATE["notes_lock"]:
@@ -1177,9 +1288,15 @@ def prepare_terminal_send(data):
                 "TOOL",
                 f"Sent to terminal ({description}). Output: {rel}",
                 tool=label,
-                command=send,
+                command=send if include_command else None,
                 purpose=purpose,
                 evidence=[rel],
+                findings=(
+                    [f"Capture file: {rel}. Review the terminal output for findings."]
+                    if include_findings else None
+                ),
+                include_command=include_command,
+                include_findings=include_findings,
             )
         notes_text = read_notes()
     return {
@@ -1688,10 +1805,14 @@ class Handler(BaseHTTPRequestHandler):
             })
             result = run_tool_streaming(command, output_file, lambda line: emit({"type": "line", "text": line}))
             log_gui_tool_to_session(command, output_file, result)
-            include_notes = data.get("include_notes") in (True, "yes", "true", 1, "1")
+            include_notes = _truthy(data.get("include_notes"))
+            include_command = _truthy(data.get("include_command")) if "include_command" in data else True
+            include_findings = _truthy(data.get("include_findings")) if "include_findings" in data else True
             record = finish_tool_run(
                 tool, command, purpose, description, result, output_file,
                 include_notes=include_notes,
+                include_command=include_command,
+                include_findings=include_findings,
             )
             emit({
                 "type": "done",
@@ -1828,7 +1949,11 @@ def main():
             os.chdir(STATE["workspace"])
         print(f"[+] Extra terminal log: {log_path}")
         print("[+] Working directory is the lab folder. Type exit when done.")
-        run_logged_shell(log_path)
+        try:
+            run_logged_shell(log_path)
+        except PermissionError as exc:
+            print(f"[-] Permission denied writing {exc.filename or log_path}")
+            print("[-] This user cannot write that log. chown the lab folder if it is owned by another account.")
         return
 
     if args.cli:
@@ -1872,9 +1997,13 @@ def main():
         return
     print("[+] Workspace ready. Starting logged shell.\n")
 
-    log_file = engine.get_next_session_log(STATE["workspace"])
     try:
+        log_file = engine.get_next_session_log(STATE["workspace"])
         start_logged_shell(log_file)
+    except PermissionError as exc:
+        print(f"[-] Permission denied writing {exc.filename or 'session log'}")
+        print("[-] This user cannot write that log. chown the lab folder if it is owned by another account.")
+        return
     except KeyboardInterrupt:
         print("\n[+] Logging stopped.")
     print(f"[*] GUI still at {url}  —  Ctrl+C to stop.")
