@@ -75,7 +75,7 @@ TOOL_GROUPS = [
                 "bin": "nmap",
                 "kind": "nmap",
                 "nmap_args": ["-Pn", "-sV", "--script", "vuln"],
-                "summary": "nmap -Pn -sV --script vuln TARGET — NSE vuln category. Authorized labs only; noisy.",
+                "summary": "nmap -Pn -sV --script vuln TARGET — NSE vuln category. Noisy.",
                 "purpose": "Check known-issue scripts against discovered services.",
             },
             {
@@ -298,7 +298,7 @@ TOOL_GROUPS = [
     {
         "id": "inject",
         "name": "6. XSS / SQL injection",
-        "blurb": "Authorized HTB-lab checks for SQL injection and cross-site scripting. Stay in scope.",
+        "blurb": "Checks for SQL injection and cross-site scripting.",
         "tools": [
             {
                 "id": "sqlmap-url",
@@ -306,7 +306,7 @@ TOOL_GROUPS = [
                 "bin": "sqlmap",
                 "kind": "template",
                 "argv": ["sqlmap", "-u", "{url}", "--batch", "--level=1", "--risk=1"],
-                "summary": "sqlmap -u URL --batch — probe GET params for SQLi. Authorized labs only.",
+                "summary": "sqlmap -u URL --batch — probe GET params for SQLi.",
                 "purpose": "See if a URL parameter is injectable.",
                 "fields": [
                     {"name": "url", "label": "Target URL (include a param)", "default": "http://{target}/?id=1"},
@@ -404,7 +404,7 @@ TOOL_GROUPS = [
                 "kind": "template",
                 "argv": ["dalfox", "url", "{url}"],
                 "summary": "dalfox url URL — automated reflected XSS scanner.",
-                "purpose": "Scan a page for reflected XSS in authorized labs.",
+                "purpose": "Scan a page for reflected XSS.",
                 "fields": [
                     {"name": "url", "label": "Target URL", "default": "http://{target}/"},
                 ],
@@ -466,7 +466,7 @@ TOOL_INFO = [
                     "-oN file.nmap    nmap text output (helper also saves a .txt capture)",
                     "-oX file.xml     XML (helper does not write this by default)",
                     "-oG file.gnmap   greppable",
-                    "--script vuln    NSE vuln category (authorized labs only; noisy)",
+                    "--script vuln    NSE vuln category (noisy)",
                     "--script vuln,safe",
                     "--script http-enum,http-title,http-methods",
                     "--script smb-enum-shares,smb-os-discovery",
@@ -665,7 +665,7 @@ TOOL_INFO = [
             {
                 "name": "SQL injection (overview)",
                 "bin": "ref",
-                "blurb": "SQLi is untrusted input reaching a SQL query. Authorized HTB labs only. Confirm a parameter is injectable before dumping anything. Never run this against hosts you do not own.",
+                "blurb": "SQLi is untrusted input reaching a SQL query. Confirm a parameter is injectable before dumping anything.",
                 "syntax": "error / boolean / UNION / time-based / stacked  ·  in-band vs blind",
                 "options": [
                     "Error-based     a quote (') or similar makes the app print a SQL error (MariaDB/Postgres/MSSQL)",
@@ -692,7 +692,7 @@ TOOL_INFO = [
             {
                 "name": "sqlmap",
                 "bin": "sqlmap",
-                "blurb": "Automated SQL injection. Helper presets stay at detection / --dbs. Add extra args yourself for tables or a dump. Authorized labs only.",
+                "blurb": "Automated SQL injection. Helper presets stay at detection / --dbs. Add extra args yourself for tables or a dump.",
                 "syntax": "sqlmap -u <url> [options]",
                 "options": [
                     "-u URL              target with a parameter (?id=1)",
@@ -720,7 +720,7 @@ TOOL_INFO = [
             {
                 "name": "Cross-site scripting (XSS)",
                 "bin": "ref",
-                "blurb": "XSS is attacker-controlled JavaScript in another user's browser. Three kinds: reflected (in the URL/response), stored (saved on the server), DOM (client-side sink). Authorized HTB labs only.",
+                "blurb": "XSS is attacker-controlled JavaScript in another user's browser. Three kinds: reflected (in the URL/response), stored (saved on the server), DOM (client-side sink).",
                 "syntax": "reflected · stored · DOM  ·  probe, then confirm in a browser",
                 "options": [
                     "Reflected       payload in the request comes back in the HTML (search box, error, redirect)",
@@ -746,7 +746,7 @@ TOOL_INFO = [
             {
                 "name": "dalfox",
                 "bin": "dalfox",
-                "blurb": "Reflected XSS scanner. Sends a lot of requests. Authorized labs only.",
+                "blurb": "Reflected XSS scanner. Sends a lot of requests.",
                 "syntax": "dalfox url <url> [options]",
                 "options": [
                     "url URL         single target (include a parameter)",
@@ -1025,7 +1025,7 @@ TOOL_INFO = [
             {
                 "name": "Nmap Modbus",
                 "bin": "nmap",
-                "blurb": "Find Modbus/TCP (usually port 502) and list unit IDs. Authorized labs only.",
+                "blurb": "Find Modbus/TCP (usually port 502) and list unit IDs.",
                 "syntax": "nmap -sV -p 502 --script modbus-discover {target}",
                 "options": [
                     "-p 502                    Modbus/TCP default",
@@ -1040,7 +1040,7 @@ TOOL_INFO = [
             {
                 "name": "pymodbus client",
                 "bin": "python3",
-                "blurb": "Read/write coils and registers over Modbus/TCP. pip install pymodbus if needed. Authorized labs only.",
+                "blurb": "Read/write coils and registers over Modbus/TCP. pip install pymodbus if needed.",
                 "syntax": "from pymodbus.client import ModbusTcpClient",
                 "options": [
                     "port 502                     Modbus/TCP",
@@ -1099,7 +1099,7 @@ TOOL_INFO = [
             {
                 "name": "Official ICS / Modbus docs",
                 "bin": "browser",
-                "blurb": "Primary references. Use these before random write-ups. Authorized labs only — do not scan or write coils on systems you do not own.",
+                "blurb": "Primary references. Use these before random write-ups.",
                 "syntax": "modbus.org  |  nist.gov SP 800-82  |  cisa.gov ICS",
                 "options": [
                     "Modbus home              https://modbus.org/",
