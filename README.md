@@ -58,6 +58,7 @@ chmod +x htb install.sh   # needed once if git lost the execute bit
 ./htb                     # GUI + logged shell
 ./htb --gui-only          # browser only, no logged shell
 ./htb --cli               # numbered menu (option 14: view/change machine or start a new lab)
+# GUI: Lab-Config (left rail, bottom) updates this lab's IP/port in place
 ./htb --check             # environment check
 ```
 

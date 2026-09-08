@@ -1,5 +1,5 @@
 (() => {
-  const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "convert", "status", "help"];
+  const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "convert", "status", "help", "lab"];
   const CATS = ["NONE", "RECON", "ENUMERATION", "FINDING", "DEAD END", "FOOTHOLD", "PRIVESC", "FLAG", "TOOL", "OTHER"];
 
   const $ = (id) => document.getElementById(id);
@@ -122,6 +122,9 @@
     if (name === "info") renderInfo();
     if (name === "tools" && !state.toolsLoaded) loadTools();
     if (name === "report" && !state.reportDirty) loadReport();
+    if (name === "lab") {
+      api("/api/state").then((data) => fillLabConfig(data.config || {})).catch(() => {});
+    }
   }
 
   function insertAtCursor(textarea, text, cursorOffset) {
@@ -213,6 +216,7 @@
     }
     $("meta-machine").textContent = (data.config && data.config.machine_name) || "—";
     $("meta-target").textContent = (data.config && data.config.target_ip) || "—";
+    $("meta-port").textContent = (data.config && data.config.target_port) || "—";
 
     let sessionLabel = "idle";
     if (data.session_active && data.session_paused) sessionLabel = "PAUSED";
@@ -674,9 +678,56 @@
     });
   }
 
+  function fillLabConfig(c) {
+    if (!$("lab-target-ip")) return;
+    $("lab-machine").value = c.machine_name || "";
+    $("lab-student").value = c.student_id || "";
+    $("lab-target-ip").value = c.target_ip || "";
+    $("lab-target-port").value = c.target_port || "";
+  }
+
+  function applySavedTarget(config) {
+    if (state.tools) {
+      state.tools.target = config.target_ip || "";
+      state.tools.port = config.target_port || "";
+    }
+    if ($("tool-target") && document.activeElement !== $("tool-target")) {
+      $("tool-target").value = config.target_ip || "";
+    }
+    if ($("tool-port") && document.activeElement !== $("tool-port") && state.currentTool && state.currentTool.kind === "nmap-port") {
+      $("tool-port").value = config.target_port || "";
+    }
+  }
+
   function wire() {
     document.querySelectorAll(".rail-btn").forEach((btn) => {
       btn.addEventListener("click", () => setTab(btn.dataset.tab));
+    });
+    $("lab-config-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errEl = $("lab-config-error");
+      const msgEl = $("lab-config-msg");
+      errEl.classList.add("hidden");
+      errEl.textContent = "";
+      msgEl.textContent = "";
+      try {
+        const data = await api("/api/lab/target", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            target_ip: $("lab-target-ip").value,
+            target_port: $("lab-target-port").value,
+          }),
+        });
+        fillLabConfig(data.config || {});
+        applySavedTarget(data.config || {});
+        await refreshState();
+        if (!state.dirty) await loadNotes();
+        msgEl.textContent = "Saved. Header target/port and Tools defaults now use the new values.";
+      } catch (err) {
+        errEl.classList.remove("hidden");
+        errEl.textContent = err.message;
+      }
     });
     $("notes-editor").addEventListener("input", onNotesInput);
     $("notes-editor").addEventListener("keydown", (e) => {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=17" />
+  <link rel="stylesheet" href="/app.css?v=18" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c9843a'/></svg>" />
 </head>
 <body>
@@ -47,6 +47,7 @@
     <dl class="meta" id="meta-bar">
       <div><dt>Machine</dt><dd id="meta-machine">—</dd></div>
       <div><dt>Target</dt><dd id="meta-target">—</dd></div>
+      <div><dt>Port</dt><dd id="meta-port">—</dd></div>
       <div><dt>Session</dt><dd id="meta-session">idle</dd></div>
     </dl>
     <div class="top-actions">
@@ -80,6 +81,8 @@
       <button data-tab="convert" class="rail-btn">Convert</button>
       <button data-tab="status" class="rail-btn">Status</button>
       <button data-tab="help" class="rail-btn">Help</button>
+      <span class="rail-spacer" aria-hidden="true"></span>
+      <button data-tab="lab" class="rail-btn">Lab-Config</button>
     </nav>
 
     <main>
@@ -370,7 +373,7 @@ git pull
           <p>On start you should see <strong>Choose a machine</strong>: pick an existing lab or create a new one. Later use <strong>Switch lab</strong> in the header. After you pick or create a lab, Help opens first.</p>
 
           <h3>Starting again the next day?</h3>
-          <p>Run <code>./htb</code> again. It does <strong>not</strong> overwrite the old log. You get <code>session.log</code>, then <code>session2.log</code>, <code>session3.log</code>, and so on.</p>
+          <p>Run <code>./htb</code> again. It does <strong>not</strong> overwrite the old log. You get <code>session.log</code>, then <code>session2.log</code>, <code>session3.log</code>, and so on. If the box has a new IP or assigned port, open <strong>Lab-Config</strong> (bottom of the left rail) and save the new values. That updates this lab in place — it does not create a new folder.</p>
 
           <h3>Where is my work?</h3>
           <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>logs/</code>, <code>screenshots/</code>, <code>notes/</code> (notes.md + evidence.md), <code>report/</code>, <code>files_given/</code>, and <code>machine_json/</code> (app-only).</p>
@@ -421,8 +424,31 @@ git pull
           <p>On start the helper tries to <code>apt install</code> packages <em>it</em> needs: <code>python3</code>, <code>nmap</code>, <code>bsdutils</code> (<code>script</code>), <code>xdg-utils</code>. That is not a full pentest-tool install. <code>./htb --no-bootstrap</code> skips it. Status → <strong>Install missing helper packages</strong> runs the same check later.</p>
         </article>
       </section>
+
+      <section id="tab-lab" class="tab">
+        <h2>Lab config</h2>
+        <p class="lede">Change this lab's target IP and assigned port without starting a new machine. Same folder, same notes. Use this when HTB issues a new IP the next day.</p>
+        <form id="lab-config-form" class="tool-form">
+          <label>Machine
+            <input id="lab-machine" readonly />
+          </label>
+          <label>Student ID
+            <input id="lab-student" readonly />
+          </label>
+          <label>Target IP
+            <input id="lab-target-ip" required autocomplete="off" placeholder="10.10.10.10" />
+          </label>
+          <label>Assigned port (optional)
+            <input id="lab-target-port" inputmode="numeric" placeholder="leave blank if none" />
+          </label>
+          <p id="lab-config-msg" class="quiet"></p>
+          <p id="lab-config-error" class="error hidden"></p>
+          <button type="submit" class="btn copper">Save IP / port</button>
+        </form>
+        <p class="quiet">To switch machines or start a new lab, use <strong>Switch lab</strong> in the header (same as <code>./htb --cli</code> option 14).</p>
+      </section>
     </main>
   </div>
-  <script src="/app.js?v=26"></script>
+  <script src="/app.js?v=27"></script>
 </body>
 </html>

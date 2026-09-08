@@ -179,6 +179,36 @@ def select_lab(folder_name: str):
     return config
 
 
+def parse_assigned_port(raw):
+    if raw in ("", None):
+        return None
+    try:
+        port = int(raw)
+    except (TypeError, ValueError):
+        raise RuntimeError("Assigned port must be a number, or blank.")
+    if not 1 <= port <= 65535:
+        raise RuntimeError("Assigned port must be between 1 and 65535, or blank.")
+    return port
+
+
+def update_current_lab_target(target_ip, target_port):
+    """Update IP/port on the open lab without creating a new workspace."""
+    if not is_configured(STATE["config"]) or not STATE["workspace"]:
+        raise RuntimeError("Pick or create a lab first.")
+    config = dict(STATE["config"])
+    config["target_ip"] = str(target_ip or "").strip()
+    config["target_port"] = parse_assigned_port(target_port)
+    if not engine.validate_config(config):
+        raise RuntimeError("Invalid target IP or port.")
+    save_config(STATE["config_path"], config)
+    STATE["config"] = config
+    engine.write_lab_metadata(STATE["workspace"], config)
+    engine.refresh_notes_machine_header(
+        STATE["workspace"], config["machine_name"], config
+    )
+    return config
+
+
 def detect_os():
     info = {}
     path = Path("/etc/os-release")
@@ -1535,6 +1565,24 @@ class Handler(BaseHTTPRequestHandler):
                 apply_config(config, STATE["config_path"])
                 STATE["session_ready"].set()
                 self._json({"ok": True, "workspace": str(STATE["workspace"])})
+                return
+
+            if path == "/api/lab/target":
+                config = update_current_lab_target(
+                    data.get("target_ip"),
+                    data.get("target_port"),
+                )
+                self._json({
+                    "ok": True,
+                    "config": {
+                        "student_id": config.get("student_id", ""),
+                        "machine_name": config.get("machine_name", ""),
+                        "target_ip": config.get("target_ip", ""),
+                        "target_port": config.get("target_port"),
+                        "research_project": config.get("research_project", ""),
+                    },
+                    "workspace": str(STATE["workspace"]),
+                })
                 return
 
             if path == "/api/labs/select":

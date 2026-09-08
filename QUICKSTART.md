@@ -140,3 +140,5 @@ python3 htb_app_lib/htb_helper.py --stats
 ```
 
 In `./htb --cli`, option **14** views/changes the machine name or starts a new lab.
+
+In the GUI, **Lab-Config** (bottom of the left rail) changes this lab's target IP and assigned port without making a new folder. Use that when the box comes back the next day with a new IP.
