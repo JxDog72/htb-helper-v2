@@ -715,6 +715,7 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            student_id: $("lab-student").value,
             machine_name: $("lab-machine").value,
             target_ip: $("lab-target-ip").value,
             target_port: $("lab-target-port").value,

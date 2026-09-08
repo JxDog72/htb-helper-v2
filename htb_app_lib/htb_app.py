@@ -202,8 +202,8 @@ def _retarget_state_path(value, old_root, new_root):
     return Path(text)
 
 
-def update_current_lab(machine_name, target_ip, target_port):
-    """Update name/IP/port on the open lab. Renames the folder and sibling exports if the slug changes."""
+def update_current_lab(student_id, machine_name, target_ip, target_port):
+    """Update student/machine/IP/port on the open lab. Renames the folder and sibling exports if the slug changes."""
     if not is_configured(STATE["config"]) or not STATE["workspace"]:
         raise RuntimeError("Pick or create a lab first.")
     old_config = dict(STATE["config"])
@@ -211,14 +211,18 @@ def update_current_lab(machine_name, target_ip, target_port):
     old_workspace = Path(STATE["workspace"]).resolve()
     updated = dict(old_config)
     updated.pop("lab_folder", None)
+    if student_id is not None:
+        sid = str(student_id).strip()
+        if sid:
+            updated["student_id"] = sid
     if machine_name is not None:
         name = str(machine_name).strip()
         if name:
             updated["machine_name"] = name
     updated["target_ip"] = str(target_ip or "").strip()
     updated["target_port"] = parse_assigned_port(target_port)
-    if not engine.validate_config(updated):
-        raise RuntimeError("Invalid machine name, target IP, or port.")
+    if not engine.validate_config(updated) or not is_configured(updated):
+        raise RuntimeError("Invalid student ID, machine name, target IP, or port.")
     derived_name = (
         engine.safe_filename(updated["student_id"])
         + "_"
@@ -1620,6 +1624,7 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/lab/target":
                 result = update_current_lab(
+                    data.get("student_id"),
                     data.get("machine_name"),
                     data.get("target_ip"),
                     data.get("target_port"),

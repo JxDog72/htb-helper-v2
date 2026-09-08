@@ -373,13 +373,13 @@ git pull
           <p>On start you should see <strong>Choose a machine</strong>: pick an existing lab or create a new one. Later use <strong>Switch lab</strong> in the header. After you pick or create a lab, Help opens first.</p>
 
           <h3>Starting again the next day?</h3>
-          <p>Run <code>./htb</code> again. It does <strong>not</strong> overwrite the old log. You get <code>session.log</code>, then <code>session2.log</code>, <code>session3.log</code>, and so on. If the box has a new IP, port, or you want a different machine name, open <strong>Lab-Config</strong> (bottom of the left rail) and save. Name changes rename the current lab folder and matching zip/7z exports.</p>
+          <p>Run <code>./htb</code> again. It does <strong>not</strong> overwrite the old log. You get <code>session.log</code>, then <code>session2.log</code>, <code>session3.log</code>, and so on. If the box has a new IP/port, or you mistyped student ID or machine name, open <strong>Lab-Config</strong> (bottom of the left rail) and save. Student/machine changes rename the current lab folder and matching zip/7z exports.</p>
 
           <h3>Where is my work?</h3>
           <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>logs/</code>, <code>screenshots/</code>, <code>notes/</code> (notes.md + evidence.md), <code>report/</code>, <code>files_given/</code>, and <code>machine_json/</code> (app-only).</p>
 
           <h3>Rename a machine</h3>
-          <p>Use <strong>Lab-Config</strong> and change <strong>Machine name</strong>, then save. That updates metadata, notes/report headers, and moves <code>machines/student_oldname/</code> to <code>machines/student_newname/</code> (logs, notes, screenshots, and the rest stay inside). Matching <code>student_oldname_….zip</code> / <code>.7z</code> next to the lab are renamed too; zip inner folders like <code>student_oldname_logs</code> become <code>student_newname_logs</code>. Do not Create workspace — that would make an empty new folder. <code>./htb --cli</code> option <strong>14</strong> does the same rename.</p>
+          <p>Use <strong>Lab-Config</strong> and change <strong>Student ID</strong> and/or <strong>Machine name</strong>, then save. That updates metadata, notes/report headers, and moves <code>machines/oldstudent_oldname/</code> to <code>machines/newstudent_newname/</code> (logs, notes, screenshots, and the rest stay inside). Matching zip/7z next to the lab are renamed too; zip inner folders like <code>oldslug_logs</code> become <code>newslug_logs</code>. Do not Create workspace — that would make an empty new folder. <code>./htb --cli</code> option <strong>14</strong> does the same rename.</p>
 
           <h3>Export ZIP / 7z and copy off Pwnbox</h3>
           <p>Status → <strong>Create ZIP</strong> then SCP from your Windows PC (hostname + username from <strong>View instance details</strong>). <strong>No space after the colon.</strong></p>
@@ -420,10 +420,10 @@ git pull
 
       <section id="tab-lab" class="tab">
         <h2>Lab config</h2>
-        <p class="lede">Change this lab's machine name, target IP, or assigned port. Notes stay with the lab. If the name changes, the helper renames <code>machines/student_machine/</code> and any matching zip/7z next to it (including the <code>student_machine_logs</code> folders inside a zip).</p>
+        <p class="lede">Fix a mistyped student ID, machine name, target IP, or assigned port. Notes stay with the lab. If student ID or machine name changes, the helper renames <code>machines/student_machine/</code> and any matching zip/7z next to it (including the <code>student_machine_logs</code> folders inside a zip).</p>
         <form id="lab-config-form" class="tool-form">
           <label>Student ID
-            <input id="lab-student" readonly />
+            <input id="lab-student" required autocomplete="off" />
           </label>
           <label>Machine name
             <input id="lab-machine" required autocomplete="off" placeholder="Slippy" />
@@ -442,6 +442,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=28"></script>
+  <script src="/app.js?v=29"></script>
 </body>
 </html>
