@@ -40,6 +40,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
 from urllib.parse import urlparse
 
 
@@ -2476,6 +2477,83 @@ def create_export_archive(workspace, *, encrypt=False, password=""):
         shutil.rmtree(root, ignore_errors=True)
 
 
+def _rewrite_zip_member_name(name, old_slug, new_slug):
+    parts = name.split("/")
+    rewritten = []
+    for part in parts:
+        if part == old_slug or part.startswith(old_slug + "_"):
+            rewritten.append(new_slug + part[len(old_slug):])
+        else:
+            rewritten.append(part)
+    return "/".join(rewritten)
+
+
+def rewrite_zip_export_slug(zip_path, old_slug, new_slug):
+    """Rename student_old_* prefixes inside an export zip to student_new_*."""
+    zip_path = Path(zip_path)
+    if zip_path.suffix.lower() != ".zip" or not zip_path.is_file():
+        return False
+    if not old_slug or old_slug == new_slug:
+        return False
+    tmp = zip_path.with_name(zip_path.name + ".renaming")
+    changed = False
+    try:
+        with zipfile.ZipFile(zip_path, "r") as src, zipfile.ZipFile(
+            tmp, "w", compression=zipfile.ZIP_DEFLATED
+        ) as dst:
+            for info in src.infolist():
+                new_name = _rewrite_zip_member_name(info.filename, old_slug, new_slug)
+                if new_name != info.filename:
+                    changed = True
+                data = src.read(info.filename)
+                new_info = zipfile.ZipInfo(filename=new_name, date_time=info.date_time)
+                new_info.compress_type = zipfile.ZIP_DEFLATED
+                new_info.external_attr = info.external_attr
+                dst.writestr(new_info, data)
+        if changed:
+            tmp.replace(zip_path)
+            return True
+        tmp.unlink(missing_ok=True)
+        return False
+    except (OSError, zipfile.BadZipFile):
+        tmp.unlink(missing_ok=True)
+        return False
+
+
+def rename_export_archives(old_workspace, new_workspace):
+    """Rename sibling zip/7z files and rewrite zip inner folders to the new slug."""
+    old_slug = Path(old_workspace).name
+    new_slug = Path(new_workspace).name
+    if not old_slug or old_slug == new_slug:
+        return []
+    dest_dir = Path(new_workspace).resolve().parent
+    if not dest_dir.is_dir():
+        dest_dir = Path(old_workspace).resolve().parent
+    moved = []
+    if not dest_dir.is_dir():
+        return moved
+    for path in list(dest_dir.iterdir()):
+        if not path.is_file():
+            continue
+        suffix = path.suffix.lower()
+        if suffix not in (".zip", ".7z"):
+            continue
+        stem_match = path.name == f"{old_slug}{path.suffix}" or path.name.startswith(old_slug + "_")
+        if not stem_match:
+            continue
+        new_path = dest_dir / (new_slug + path.name[len(old_slug):])
+        if new_path.exists():
+            continue
+        try:
+            path.rename(new_path)
+        except OSError:
+            continue
+        if suffix == ".zip":
+            rewrite_zip_export_slug(new_path, old_slug, new_slug)
+        moved.append(str(new_path))
+    return moved
+
+
 def create_zip(workspace):
     print("\n" + "=" * 60)
     print("CREATING ZIP BACKUP")
@@ -2592,6 +2670,38 @@ def refresh_notes_machine_header(workspace, old_name, config):
         path.write_text(new_text, encoding="utf-8")
 
 
+def refresh_report_machine_header(workspace, old_name, config):
+    path = report_file(workspace)
+    if not path.exists() or not old_name:
+        return
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    new_name = config["machine_name"]
+    if old_name == new_name:
+        return
+    updated = text
+    old_heading = f"# HTB Challenge: {old_name}"
+    if updated.startswith(old_heading):
+        updated = f"# HTB Challenge: {new_name}" + updated[len(old_heading):]
+    updated = updated.replace(
+        f"authorized HTB machine **{old_name}**",
+        f"authorized HTB machine **{new_name}**",
+        1,
+    )
+    target = config.get("target_ip") or ""
+    port = config.get("target_port") or "None"
+    updated = re.sub(
+        r"at `[^`]+`\n\(assigned port: `[^`]+`\)\.",
+        f"at `{target}`\n(assigned port: `{port}`).",
+        updated,
+        count=1,
+    )
+    if updated != text:
+        path.write_text(updated, encoding="utf-8")
+
+
 def list_lab_folders(config):
     root = workspace_root_from_config(config)
     labs = []
@@ -2659,6 +2769,7 @@ def apply_cli_config(config, workspace, config_path, *, old_name=None, renamed_f
     write_lab_metadata(workspace, config)
     if old_name:
         refresh_notes_machine_header(workspace, old_name, config)
+        refresh_report_machine_header(workspace, old_name, config)
     if renamed_from:
         print(f"[+] Folder renamed:\n    {renamed_from}\n    -> {workspace}")
     print(f"[+] Active machine: {config['machine_name']}")
@@ -2699,13 +2810,17 @@ def change_current_machine(config, workspace, config_path, session_active=False)
             print(f"[-] Cannot rename: {new_workspace} already exists.")
             return config, workspace
         old_workspace.rename(new_workspace)
-        return apply_cli_config(
+        archives = rename_export_archives(old_workspace, new_workspace)
+        config, workspace = apply_cli_config(
             updated,
             new_workspace,
             config_path,
             old_name=old_name,
             renamed_from=old_workspace,
         )
+        for archive in archives:
+            print(f"[+] Export renamed:\n    {archive}")
+        return config, workspace
     return apply_cli_config(updated, new_workspace, config_path, old_name=old_name)
 
 

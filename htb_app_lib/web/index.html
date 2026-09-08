@@ -373,20 +373,13 @@ git pull
           <p>On start you should see <strong>Choose a machine</strong>: pick an existing lab or create a new one. Later use <strong>Switch lab</strong> in the header. After you pick or create a lab, Help opens first.</p>
 
           <h3>Starting again the next day?</h3>
-          <p>Run <code>./htb</code> again. It does <strong>not</strong> overwrite the old log. You get <code>session.log</code>, then <code>session2.log</code>, <code>session3.log</code>, and so on. If the box has a new IP or assigned port, open <strong>Lab-Config</strong> (bottom of the left rail) and save the new values. That updates this lab in place — it does not create a new folder.</p>
+          <p>Run <code>./htb</code> again. It does <strong>not</strong> overwrite the old log. You get <code>session.log</code>, then <code>session2.log</code>, <code>session3.log</code>, and so on. If the box has a new IP, port, or you want a different machine name, open <strong>Lab-Config</strong> (bottom of the left rail) and save. Name changes rename the current lab folder and matching zip/7z exports.</p>
 
           <h3>Where is my work?</h3>
           <p><code>machines/&lt;student&gt;_&lt;machine&gt;/</code> holds <code>logs/</code>, <code>screenshots/</code>, <code>notes/</code> (notes.md + evidence.md), <code>report/</code>, <code>files_given/</code>, and <code>machine_json/</code> (app-only).</p>
 
           <h3>Rename a machine</h3>
-          <p>Renaming the folder under <code>machines/</code> does <strong>not</strong> change the name in the GUI. The label comes from <code>machine_json/metadata.json</code>.</p>
-          <ol>
-            <li>Stop the helper (<code>exit</code>, then Ctrl+C).</li>
-            <li>Open <code>machines/&lt;student&gt;_&lt;oldname&gt;/machine_json/metadata.json</code> and set <code>"machine_name"</code> (same file can change <code>target_ip</code> / <code>assigned_port</code>).</li>
-            <li>Optional: rename the folder to <code>student_newname</code> so it matches. Also set <code>"machine_name"</code> in <code>research_manifest.json</code> if that file exists.</li>
-            <li>Start <code>./htb</code> again and <strong>Open selected lab</strong> on that <em>same</em> folder (the one that still has your <code>logs/</code>). Do not Create workspace — that would make an empty new folder.</li>
-          </ol>
-          <p>If an empty <code>student_newname</code> folder appeared, that was the helper following the new name. You can delete the empty one. <code>./htb --cli</code> option <strong>14</strong> can rename the current lab and move the folder (keeping files) for you.</p>
+          <p>Use <strong>Lab-Config</strong> and change <strong>Machine name</strong>, then save. That updates metadata, notes/report headers, and moves <code>machines/student_oldname/</code> to <code>machines/student_newname/</code> (logs, notes, screenshots, and the rest stay inside). Matching <code>student_oldname_….zip</code> / <code>.7z</code> next to the lab are renamed too; zip inner folders like <code>student_oldname_logs</code> become <code>student_newname_logs</code>. Do not Create workspace — that would make an empty new folder. <code>./htb --cli</code> option <strong>14</strong> does the same rename.</p>
 
           <h3>Export ZIP / 7z and copy off Pwnbox</h3>
           <p>Status → <strong>Create ZIP</strong> then SCP from your Windows PC (hostname + username from <strong>View instance details</strong>). <strong>No space after the colon.</strong></p>
@@ -427,13 +420,13 @@ git pull
 
       <section id="tab-lab" class="tab">
         <h2>Lab config</h2>
-        <p class="lede">Change this lab's target IP and assigned port without starting a new machine. Same folder, same notes. Use this when HTB issues a new IP the next day.</p>
+        <p class="lede">Change this lab's machine name, target IP, or assigned port. Notes stay with the lab. If the name changes, the helper renames <code>machines/student_machine/</code> and any matching zip/7z next to it (including the <code>student_machine_logs</code> folders inside a zip).</p>
         <form id="lab-config-form" class="tool-form">
-          <label>Machine
-            <input id="lab-machine" readonly />
-          </label>
           <label>Student ID
             <input id="lab-student" readonly />
+          </label>
+          <label>Machine name
+            <input id="lab-machine" required autocomplete="off" placeholder="Slippy" />
           </label>
           <label>Target IP
             <input id="lab-target-ip" required autocomplete="off" placeholder="10.10.10.10" />
@@ -443,12 +436,12 @@ git pull
           </label>
           <p id="lab-config-msg" class="quiet"></p>
           <p id="lab-config-error" class="error hidden"></p>
-          <button type="submit" class="btn copper">Save IP / port</button>
+          <button type="submit" class="btn copper">Save lab config</button>
         </form>
-        <p class="quiet">To switch machines or start a new lab, use <strong>Switch lab</strong> in the header (same as <code>./htb --cli</code> option 14).</p>
+        <p class="quiet">To switch machines or start a new lab, use <strong>Switch lab</strong> in the header (same as <code>./htb --cli</code> option 14). If rename fails because the logged shell is sitting in that folder, type <code>exit</code>, Ctrl+C, start <code>./htb</code> again, then save.</p>
       </section>
     </main>
   </div>
-  <script src="/app.js?v=27"></script>
+  <script src="/app.js?v=28"></script>
 </body>
 </html>

@@ -191,22 +191,73 @@ def parse_assigned_port(raw):
     return port
 
 
-def update_current_lab_target(target_ip, target_port):
-    """Update IP/port on the open lab without creating a new workspace."""
+def _retarget_state_path(value, old_root, new_root):
+    if not value:
+        return value
+    old_s = str(Path(old_root).resolve())
+    new_s = str(Path(new_root).resolve())
+    text = str(value)
+    if text.startswith(old_s):
+        return Path(new_s + text[len(old_s):])
+    return Path(text)
+
+
+def update_current_lab(machine_name, target_ip, target_port):
+    """Update name/IP/port on the open lab. Renames the folder and sibling exports if the slug changes."""
     if not is_configured(STATE["config"]) or not STATE["workspace"]:
         raise RuntimeError("Pick or create a lab first.")
-    config = dict(STATE["config"])
-    config["target_ip"] = str(target_ip or "").strip()
-    config["target_port"] = parse_assigned_port(target_port)
-    if not engine.validate_config(config):
-        raise RuntimeError("Invalid target IP or port.")
-    save_config(STATE["config_path"], config)
-    STATE["config"] = config
-    engine.write_lab_metadata(STATE["workspace"], config)
-    engine.refresh_notes_machine_header(
-        STATE["workspace"], config["machine_name"], config
+    old_config = dict(STATE["config"])
+    old_name = old_config.get("machine_name") or ""
+    old_workspace = Path(STATE["workspace"]).resolve()
+    updated = dict(old_config)
+    updated.pop("lab_folder", None)
+    if machine_name is not None:
+        name = str(machine_name).strip()
+        if name:
+            updated["machine_name"] = name
+    updated["target_ip"] = str(target_ip or "").strip()
+    updated["target_port"] = parse_assigned_port(target_port)
+    if not engine.validate_config(updated):
+        raise RuntimeError("Invalid machine name, target IP, or port.")
+    derived_name = (
+        engine.safe_filename(updated["student_id"])
+        + "_"
+        + engine.safe_filename(updated["machine_name"])
     )
-    return config
+    new_workspace = old_workspace.parent / derived_name
+
+    renamed = False
+    archives = []
+    if new_workspace.resolve() != old_workspace:
+        if new_workspace.exists():
+            raise RuntimeError(f"Cannot rename: {new_workspace.name} already exists.")
+        try:
+            old_workspace.rename(new_workspace)
+        except OSError as exc:
+            raise RuntimeError(
+                "Could not rename the lab folder (the logged terminal is probably still using it). "
+                "Type exit in that terminal, Ctrl+C, start ./htb again, then retry. "
+                f"({exc})"
+            ) from exc
+        renamed = True
+        archives = engine.rename_export_archives(old_workspace, new_workspace)
+        STATE["session_log"] = _retarget_state_path(
+            STATE.get("session_log"), old_workspace, new_workspace
+        )
+
+    updated["lab_folder"] = new_workspace.name
+    save_config(STATE["config_path"], updated)
+    apply_config(updated, STATE["config_path"], workspace=new_workspace)
+    engine.write_lab_metadata(STATE["workspace"], updated)
+    engine.refresh_notes_machine_header(STATE["workspace"], old_name, updated)
+    engine.refresh_report_machine_header(STATE["workspace"], old_name, updated)
+    return {
+        "config": STATE["config"],
+        "workspace": str(STATE["workspace"]),
+        "renamed": renamed,
+        "folder": STATE["workspace"].name if STATE["workspace"] else "",
+        "archives": archives,
+    }
 
 
 def detect_os():
@@ -1568,10 +1619,12 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/lab/target":
-                config = update_current_lab_target(
+                result = update_current_lab(
+                    data.get("machine_name"),
                     data.get("target_ip"),
                     data.get("target_port"),
                 )
+                config = result["config"] or {}
                 self._json({
                     "ok": True,
                     "config": {
@@ -1581,7 +1634,10 @@ class Handler(BaseHTTPRequestHandler):
                         "target_port": config.get("target_port"),
                         "research_project": config.get("research_project", ""),
                     },
-                    "workspace": str(STATE["workspace"]),
+                    "workspace": result["workspace"],
+                    "renamed": result["renamed"],
+                    "folder": result["folder"],
+                    "archives": result["archives"],
                 })
                 return
 

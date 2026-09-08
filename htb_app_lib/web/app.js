@@ -715,6 +715,7 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            machine_name: $("lab-machine").value,
             target_ip: $("lab-target-ip").value,
             target_port: $("lab-target-port").value,
           }),
@@ -723,7 +724,13 @@
         applySavedTarget(data.config || {});
         await refreshState();
         if (!state.dirty) await loadNotes();
-        msgEl.textContent = "Saved. Header target/port and Tools defaults now use the new values.";
+        if (!state.reportDirty) await loadReport();
+        const bits = ["Saved. Header and Tools defaults now use the new values."];
+        if (data.renamed && data.folder) bits.push("Lab folder is now " + data.folder + ".");
+        if (data.archives && data.archives.length) {
+          bits.push("Renamed " + data.archives.length + " export archive(s).");
+        }
+        msgEl.textContent = bits.join(" ");
       } catch (err) {
         errEl.classList.remove("hidden");
         errEl.textContent = err.message;
