@@ -161,26 +161,11 @@ def _run_windows(log_file: Path) -> int:
     global _log_fp
     _pause.clear()
     _log_fp = log
-    used_piped = False
+    used_piped = True
     try:
-        try:
-            import windows_conpty
-
-            if windows_conpty.available():
-                print("[+] Console capture is ON (ConPTY). Type normally — you should see a prompt.")
-                print("[+] Ctrl+C stops the current command. Ctrl+C twice quickly exits this logger.")
-                print("[+] Type 'exit' when the session is finished.\n")
-                return windows_conpty.run(
-                    log=log,
-                    pause_event=_pause,
-                    log_lock=_log_lock,
-                    set_stdin=_set_windows_stdin,
-                    encoding=encoding,
-                    inject_file=inject_queue_path(log_file),
-                )
-        except Exception as exc:
-            print(f"[!] ConPTY failed ({exc}). Falling back to pipes — if this window freezes, use .\\htb.cmd --gui-only")
-        used_piped = True
+        print("[+] Console capture is ON. Type in THIS window — it is session.log.")
+        print("[+] Ctrl+C stops the current command. Ctrl+C twice quickly exits this logger.")
+        print("[+] Type 'exit' when the session is finished.\n")
         return _run_windows_piped(log_file, log=log, encoding=encoding)
     finally:
         if not used_piped:
@@ -356,13 +341,16 @@ def _run_windows_piped(log_file: Path, log=None, encoding=None) -> int:
         _log_fp = log
     log_lock = _log_lock
 
+    # Hide cmd.exe so it cannot pop a second unlogged console. This window
+    # is the one you type in; output is copied here and into session.log.
+    CREATE_NO_WINDOW = 0x08000000
     proc = subprocess.Popen(
-        [comspec, "/D", "/K", "prompt $P$G"],
+        [comspec, "/D", "/Q", "/K", "prompt $P$G"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         bufsize=0,
-        creationflags=CREATE_NEW_PROCESS_GROUP,
+        creationflags=CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW,
     )
     _windows_stdin = proc.stdin
 
@@ -471,9 +459,11 @@ def _run_windows_piped(log_file: Path, log=None, encoding=None) -> int:
     kernel32.SetConsoleCtrlHandler.restype = wintypes.BOOL
     kernel32.SetConsoleCtrlHandler(ctrl_handler, True)
 
-    print("[+] Console capture is ON (pipe fallback). If keys do nothing, close this window and run .\\htb.cmd --gui-only")
-    print("[+] Ctrl+C stops the current command. Ctrl+C twice quickly exits this logger.")
-    print("[+] Type 'exit' when the session is finished.\n")
+    try:
+        proc.stdin.write(b"\r\n")
+        proc.stdin.flush()
+    except Exception:
+        pass
 
     try:
         proc.wait()

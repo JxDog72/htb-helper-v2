@@ -21,6 +21,9 @@ kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 HPCON = wintypes.HANDLE
 PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE = 0x00020016
 EXTENDED_STARTUPINFO_PRESENT = 0x00080000
+CREATE_UNICODE_ENVIRONMENT = 0x00000400
+CREATE_NO_WINDOW = 0x08000000
+STARTF_USESTDHANDLES = 0x00000100
 ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
 ENABLE_PROCESSED_OUTPUT = 0x0001
 ENABLE_WRAP_AT_EOL_OUTPUT = 0x0002
@@ -338,11 +341,12 @@ def run(*, log, pause_event, log_lock, set_stdin, encoding="utf-8", startup_inpu
     if not kernel32.InitializeProcThreadAttributeList(attr_buf, 1, 0, ctypes.byref(attr_size)):
         kernel32.ClosePseudoConsole(h_pc)
         raise OSError("InitializeProcThreadAttributeList failed")
+    # Microsoft/node-pty pass the HPCON handle itself as lpValue, not &handle.
     if not kernel32.UpdateProcThreadAttribute(
         attr_buf,
         0,
         PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
-        ctypes.byref(h_pc),
+        ctypes.c_void_p(h_pc.value),
         ctypes.sizeof(wintypes.HANDLE),
         None,
         None,
@@ -353,9 +357,15 @@ def run(*, log, pause_event, log_lock, set_stdin, encoding="utf-8", startup_inpu
 
     siex = STARTUPINFOEXW()
     siex.StartupInfo.cb = ctypes.sizeof(STARTUPINFOEXW)
+    # Keep the child off this console; otherwise cmd pops a 3rd window and
+    # bypasses the PTY (session.log stays empty).
+    siex.StartupInfo.dwFlags = STARTF_USESTDHANDLES
+    siex.StartupInfo.hStdInput = None
+    siex.StartupInfo.hStdOutput = None
+    siex.StartupInfo.hStdError = None
     siex.lpAttributeList = ctypes.cast(attr_buf, ctypes.c_void_p)
 
-    cmdline = ctypes.create_unicode_buffer(f'"{comspec}" /D /K prompt $P$G')
+    cmdline = ctypes.create_unicode_buffer(f'"{comspec}" /D /K')
     cwd = os.getcwd()
     pi = PROCESS_INFORMATION()
     ok = kernel32.CreateProcessW(
@@ -364,7 +374,7 @@ def run(*, log, pause_event, log_lock, set_stdin, encoding="utf-8", startup_inpu
         None,
         None,
         False,
-        EXTENDED_STARTUPINFO_PRESENT,
+        EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW,
         None,
         cwd,
         ctypes.byref(siex),

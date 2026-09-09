@@ -15,6 +15,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 import argparse
 import base64
+import ctypes
 import ipaddress
 import json
 import os
@@ -1984,8 +1985,8 @@ def start_logged_shell(log_file: Path):
         ]
         flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0x00000010)
         subprocess.Popen(inner, cwd=str(STATE["workspace"]), creationflags=flags)
-        print("[+] Logged cmd opened in a NEW window — type there (prompt should work).")
-        print("[+] This window is GUI-only. Ctrl+C here stops the helper, not the lab shell.\n")
+        print("[+] Logged shell opened in a NEW window titled like python.exe — type THERE.")
+        print("[+] That window is session.log. This window is GUI-only (Ctrl+C stops the helper).\n")
         return
     print("[+] Work in THIS terminal. Notes / tools GUI is the browser.\n")
     run_logged_shell(log_file)
@@ -2075,8 +2076,13 @@ def main():
             log_path = (ROOT / log_path).resolve()
         if STATE["workspace"]:
             os.chdir(STATE["workspace"])
+        if os.name == "nt":
+            try:
+                ctypes.windll.kernel32.SetConsoleTitleW("HTB Helper — type here (session.log)")
+            except Exception:
+                pass
         print(f"[+] Extra terminal log: {log_path}")
-        print("[+] Working directory is the lab folder. Type exit when done.")
+        print("[+] Working directory is the lab folder. Type in THIS window. Type exit when done.")
         try:
             run_logged_shell(log_path)
         except PermissionError as exc:
