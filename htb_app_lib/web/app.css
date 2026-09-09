@@ -70,8 +70,10 @@ button { cursor: pointer; }
 .rail {
   background: var(--rail);
   border-right: 1px solid var(--rule);
-  padding: 0.6rem 0.4rem;
+  padding: 0.6rem 0.4rem 1.4rem;
   display: flex; flex-direction: column; gap: 0.25rem;
+  overflow-y: auto;
+  min-height: 0;
 }
 .rail-btn {
   background: transparent; border: 0; color: var(--quiet);
@@ -81,7 +83,6 @@ button { cursor: pointer; }
 }
 .rail-btn:hover { color: #efe6d4; }
 .rail-btn.active { color: var(--copper-hot); border-left-color: var(--copper); background: #1c1712; }
-.rail-spacer { flex: 1 1 auto; min-height: 1rem; }
 
 main { overflow: hidden; min-width: 0; }
 .tab { display: none; height: 100%; padding: 0.8rem 1rem; overflow: auto; }
