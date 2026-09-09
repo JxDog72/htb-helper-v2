@@ -20,6 +20,7 @@
     toolRunning: false,
     applyingPreview: false,
     lastOutFile: "",
+    osName: "",
   };
 
   function escapeHtml(s) {
@@ -214,6 +215,7 @@
       if (c.research_project) form.research_project.value = c.research_project;
       state.setupSeeded = true;
     }
+    if (data.os_name) state.osName = data.os_name;
     $("meta-machine").textContent = (data.config && data.config.machine_name) || "—";
     $("meta-target").textContent = (data.config && data.config.target_ip) || "—";
     $("meta-port").textContent = (data.config && data.config.target_port) || "—";
@@ -514,7 +516,10 @@
 
   function teeCopy(cmd, outFile) {
     const dest = outFile || "logs/tool.txt";
-    return cmd ? `${cmd} | tee "${dest}"` : "";
+    if (!cmd) return "";
+    if (state.osName === "nt") return cmd;
+    if (cmd.includes("| tee ") || cmd.endsWith("| tee")) return cmd;
+    return `${cmd} | tee "${dest}"`;
   }
 
   async function previewCommand(force) {
@@ -534,6 +539,7 @@
       $("tool-cmd").value = data.command || "";
       $("tool-copy").value = data.copy_command || teeCopy(data.command, data.output_file);
       $("tool-cmd-preview").textContent = data.output_file ? "saves " + data.output_file : "";
+      if (data.os_name) state.osName = data.os_name;
       state.lastOutFile = data.output_file || state.lastOutFile;
       state.applyingPreview = false;
       if (force) state.cmdDirty = false;

@@ -596,10 +596,15 @@ def retarget_nmap_on(command, nmap_file: Path):
 
 
 def tee_command(cmd: str, rel: str):
+    """Linux: cmd | tee file. Windows cmd.exe has no tee — send the raw command.
+    Session capture still logs the console. Do not change the Linux string.
+    """
     text = str(cmd or "").rstrip()
     if not text:
         return text
     if "| tee " in text or text.endswith("| tee"):
+        return text
+    if os.name == "nt":
         return text
     return f'{text} | tee "{rel}"'
 
@@ -1494,6 +1499,7 @@ class Handler(BaseHTTPRequestHandler):
                     "stats": stats_payload() if STATE["workspace"] else {},
                     "labs": list_labs(),
                     "current_lab": STATE["workspace"].name if STATE["workspace"] else None,
+                    "os_name": os.name,
                 })
                 return
             if path == "/api/labs":
@@ -1858,6 +1864,7 @@ class Handler(BaseHTTPRequestHandler):
                     "command": cmd,
                     "output_file": rel,
                     "copy_command": tee_command(cmd, rel),
+                    "os_name": os.name,
                 })
                 return
 
@@ -1911,7 +1918,7 @@ class Handler(BaseHTTPRequestHandler):
                 "type": "command",
                 "command": cmd,
                 "output_file": rel,
-                "copy_command": f'{cmd} | tee "{rel}"',
+                "copy_command": tee_command(cmd, rel),
             })
             result = run_tool_streaming(command, output_file, lambda line: emit({"type": "line", "text": line}))
             log_gui_tool_to_session(command, output_file, result)

@@ -159,7 +159,7 @@
               <label>Command
                 <textarea id="tool-cmd" rows="2" spellcheck="false" placeholder="Loads from the selected tool. Edit before you run."></textarea>
               </label>
-              <p class="quiet">Command box is what runs. Prefer <strong>Send to terminal</strong> so it appears in your logged shell. <strong>Run and capture</strong> runs it from the GUI and also appends the output to the current session.log.</p>
+              <p class="quiet">Command box is what runs. Prefer <strong>Send to terminal</strong> so it appears in your logged shell. Linux also pipes through <code>tee</code> into a .txt; Windows cmd has no <code>tee</code>, so the raw command is sent (session.log still captures it). <strong>Run and capture</strong> runs it from the GUI and also appends the output to the current session.log.</p>
               <label>Copy for your own terminal (saves .txt)
                 <textarea id="tool-copy" rows="2" spellcheck="false" placeholder="Updates when you change IP/port. Edit if you want."></textarea>
               </label>
@@ -442,6 +442,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=30"></script>
+  <script src="/app.js?v=31"></script>
 </body>
 </html>
