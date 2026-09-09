@@ -82,6 +82,17 @@ def capture_queue_path(log_file=None):
     return inj.parent / ".htb_capture"
 
 
+def clear_tool_capture(log_file=None):
+    cap = capture_queue_path(log_file)
+    if cap is None:
+        return
+    try:
+        if cap.is_file():
+            cap.write_text("", encoding="utf-8")
+    except OSError:
+        pass
+
+
 def set_tool_capture(dest, log_file=None) -> bool:
     """Point the Windows logger at a logs/*.txt capture file (not via tee)."""
     cap = capture_queue_path(log_file)

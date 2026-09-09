@@ -493,6 +493,7 @@
       include_notes: include,
       include_command: !!(include && $("tool-notes-cmd") && $("tool-notes-cmd").checked),
       include_findings: !!(include && $("tool-notes-findings") && $("tool-notes-findings").checked),
+      include_txt: !!($("tool-capture-txt") && $("tool-capture-txt").checked),
     };
   }
 
@@ -518,7 +519,8 @@
     const dest = outFile || "logs/tool.txt";
     if (!cmd) return "";
     if (cmd.includes("| tee ") || cmd.endsWith("| tee")) return cmd;
-    if (state.osName === "nt") return cmd;
+    const wantTxt = !!($("tool-capture-txt") && $("tool-capture-txt").checked);
+    if (!wantTxt || state.osName === "nt") return cmd;
     return `${cmd} | tee "${dest}"`;
   }
 
@@ -533,6 +535,7 @@
           id: state.currentTool.id,
           extra: $("tool-extra").value,
           fields: toolFields(),
+          include_txt: !!($("tool-capture-txt") && $("tool-capture-txt").checked),
         }),
       });
       state.applyingPreview = true;
@@ -934,6 +937,9 @@
     });
     if ($("tool-notes")) {
       $("tool-notes").addEventListener("change", syncNotesOptions);
+    }
+    if ($("tool-capture-txt")) {
+      $("tool-capture-txt").addEventListener("change", () => schedulePreview());
     }
     $("btn-tool-send").addEventListener("click", async () => {
       const cmd = ($("tool-cmd").value || "").trim();

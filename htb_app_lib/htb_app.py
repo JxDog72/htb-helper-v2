@@ -38,6 +38,7 @@ from session_capture import (
     session_paused,
     set_session_paused,
     set_tool_capture,
+    clear_tool_capture,
 )
 from tools_catalog import (
     COMMON_WORDLISTS,
@@ -1364,16 +1365,22 @@ def prepare_terminal_send(data):
             command_text = format_command(retarget_nmap_on(parts, nmap_file))
         except ValueError:
             pass
-    out = unique_capture_path(label, ".txt")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    abs_out = str(out.resolve())
-    rel = engine.relative_path(ws, out)
-    if os.name == "nt":
-        out.touch(exist_ok=True)
-        set_tool_capture(out)
-        send = command_text
-    else:
-        send = tee_command(command_text, abs_out)
+    include_txt = True if "include_txt" not in data else _truthy(data.get("include_txt"))
+    rel = None
+    send = command_text
+    if os.name == "nt" and not include_txt:
+        clear_tool_capture()
+    if include_txt:
+        out = unique_capture_path(label, ".txt")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        abs_out = str(out.resolve())
+        rel = engine.relative_path(ws, out)
+        if os.name == "nt":
+            out.touch(exist_ok=True)
+            set_tool_capture(out)
+            send = command_text
+        else:
+            send = tee_command(command_text, abs_out)
     purpose = str(data.get("purpose") or "").strip() or "Sent to the logged terminal."
     description = (tool or {}).get("name") or label
     engine.save_command_record(
@@ -1392,14 +1399,14 @@ def prepare_terminal_send(data):
             engine.append_timeline_note(
                 ws,
                 "TOOL",
-                f"Sent to terminal ({description}). Output: {rel}",
+                f"Sent to terminal ({description})" + (f". Output: {rel}" if rel else "."),
                 tool=label,
                 command=send if include_command else None,
                 purpose=purpose,
-                evidence=[rel],
+                evidence=[rel] if rel else None,
                 findings=(
                     [f"Capture file: {rel}. Review the terminal output for findings."]
-                    if include_findings else None
+                    if include_findings and rel else None
                 ),
                 include_command=include_command,
                 include_findings=include_findings,
@@ -1872,13 +1879,18 @@ class Handler(BaseHTTPRequestHandler):
                 tool, fields = collect_tool_fields(data)
                 command = build_command(tool, fields, data.get("extra") or "", STATE["config"])
                 label = tool.get("bin") or tool.get("id") or command[0]
-                out = unique_capture_path(label, ".txt")
-                rel = engine.relative_path(STATE["workspace"], out)
                 cmd = format_command(command)
+                include_txt = True if "include_txt" not in data else _truthy(data.get("include_txt"))
+                rel = None
+                copy_cmd = cmd
+                if include_txt:
+                    out = unique_capture_path(label, ".txt")
+                    rel = engine.relative_path(STATE["workspace"], out)
+                    copy_cmd = tee_command(cmd, rel)
                 self._json({
                     "command": cmd,
                     "output_file": rel,
-                    "copy_command": tee_command(cmd, rel),
+                    "copy_command": copy_cmd,
                     "os_name": os.name,
                 })
                 return

@@ -159,10 +159,12 @@
               <label>Command
                 <textarea id="tool-cmd" rows="2" spellcheck="false" placeholder="Loads from the selected tool. Edit before you run."></textarea>
               </label>
-              <p class="quiet">Command box is what runs. Prefer <strong>Send to terminal</strong> so it appears in your logged shell. Linux also pipes through <code>tee</code> into a .txt. Windows cmd has no <code>tee</code>; the logger copies that run into the .txt (and session.log). <strong>Run and capture</strong> writes the .txt from the GUI.</p>
-              <label>Copy for your own terminal (saves .txt)
+              <p class="quiet">Command box is what runs. Prefer <strong>Send to terminal</strong> so it appears in your logged shell. <strong>Run and capture</strong> runs it from the GUI. Session.log always records the logged shell.</p>
+              <label>Copy for your own terminal
                 <textarea id="tool-copy" rows="2" spellcheck="false" placeholder="Updates when you change IP/port. Edit if you want."></textarea>
               </label>
+              <label class="check"><input type="checkbox" id="tool-capture-txt" checked /> Include output .txt for this command</label>
+              <p class="quiet">On: also write <code>logs/tool_time.txt</code> (Linux <code>tee</code>, Windows logger copy). Off: session.log / commands.log only.</p>
               <label class="check"><input type="checkbox" id="tool-notes" /> Include tool use in notes.md</label>
               <div id="tool-notes-extra" class="notes-opts hidden">
                 <label class="check"><input type="checkbox" id="tool-notes-cmd" checked /> Include full command syntax</label>
@@ -442,6 +444,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=33"></script>
+  <script src="/app.js?v=34"></script>
 </body>
 </html>
