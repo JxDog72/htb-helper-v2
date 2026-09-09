@@ -517,8 +517,11 @@
   function teeCopy(cmd, outFile) {
     const dest = outFile || "logs/tool.txt";
     if (!cmd) return "";
-    if (state.osName === "nt") return cmd;
     if (cmd.includes("| tee ") || cmd.endsWith("| tee")) return cmd;
+    if (state.osName === "nt") {
+      const win = String(dest).replace(/\//g, "\\");
+      return `${cmd} > "${win}" 2>&1 & type "${win}"`;
+    }
     return `${cmd} | tee "${dest}"`;
   }
 

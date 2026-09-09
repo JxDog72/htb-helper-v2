@@ -554,6 +554,8 @@ def list_workspace_files():
         return []
     rows = []
     for path in sorted(p for p in ws.rglob("*") if p.is_file()):
+        if path.name.startswith("."):
+            continue
         try:
             size = path.stat().st_size
         except OSError:
@@ -596,16 +598,15 @@ def retarget_nmap_on(command, nmap_file: Path):
 
 
 def tee_command(cmd: str, rel: str):
-    """Linux: cmd | tee file. Windows cmd.exe has no tee — send the raw command.
-    Session capture still logs the console. Do not change the Linux string.
-    """
+    """Linux: cmd | tee file (unchanged). Windows cmd has no tee — redirect then type."""
     text = str(cmd or "").rstrip()
     if not text:
         return text
     if "| tee " in text or text.endswith("| tee"):
         return text
     if os.name == "nt":
-        return text
+        dest = str(rel).replace("/", "\\")
+        return f'{text} > "{dest}" 2>&1 & type "{dest}"'
     return f'{text} | tee "{rel}"'
 
 
@@ -615,9 +616,18 @@ def log_files():
         return []
     logs = engine.logs_dir(ws)
     names = []
+    leftover = logs / ".htb_inject"
+    if leftover.is_file():
+        try:
+            leftover.unlink()
+        except OSError:
+            pass
     for path in sorted(logs.glob("*"), key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True):
-        if path.is_file():
-            names.append(path.name)
+        if not path.is_file():
+            continue
+        if path.name.startswith("."):
+            continue
+        names.append(path.name)
     return names
 
 

@@ -76,10 +76,24 @@ def set_inject_log(log_file):
 
 
 def inject_queue_path(log_file=None):
+    """App-only file under machine_json/, never logs/ (that dropdown lists every file)."""
     path = Path(log_file or _inject_log or "")
-    if not path:
+    if not str(path):
         return None
-    return path.parent / _INJECT_NAME
+    logs_dir = path.parent
+    lab = logs_dir.parent if logs_dir.name.lower() == "logs" else logs_dir
+    dest_dir = lab / "machine_json"
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return None
+    leftover = logs_dir / _INJECT_NAME
+    if leftover.is_file():
+        try:
+            leftover.unlink()
+        except OSError:
+            pass
+    return dest_dir / _INJECT_NAME
 
 
 def queue_windows_inject(command: str, log_file=None) -> bool:
