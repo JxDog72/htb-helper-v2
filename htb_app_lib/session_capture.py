@@ -75,6 +75,45 @@ def set_inject_log(log_file):
     _inject_log = Path(log_file) if log_file else None
 
 
+def capture_queue_path(log_file=None):
+    inj = inject_queue_path(log_file)
+    if inj is None:
+        return None
+    return inj.parent / ".htb_capture"
+
+
+def set_tool_capture(dest, log_file=None) -> bool:
+    """Point the Windows logger at a logs/*.txt capture file (not via tee)."""
+    cap = capture_queue_path(log_file)
+    if cap is None or not dest:
+        return False
+    path = Path(dest)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch(exist_ok=True)
+        cap.write_text(str(path.resolve()) + "\n", encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
+
+def append_tool_capture(text, log_file=None):
+    cap = capture_queue_path(log_file)
+    if cap is None or not cap.is_file() or not text:
+        return
+    try:
+        dest = cap.read_text(encoding="utf-8").strip()
+    except OSError:
+        return
+    if not dest:
+        return
+    try:
+        with Path(dest).open("a", encoding="utf-8", errors="replace") as handle:
+            handle.write(text)
+    except OSError:
+        pass
+
+
 def inject_queue_path(log_file=None):
     """App-only file under machine_json/, never logs/ (that dropdown lists every file)."""
     path = Path(log_file or _inject_log or "")
@@ -376,6 +415,7 @@ def _run_windows_piped(log_file: Path, log=None, encoding=None) -> int:
         with log_lock:
             log.write(text)
             log.flush()
+        append_tool_capture(text, log_file)
 
     def pump_out():
         assert proc.stdout is not None

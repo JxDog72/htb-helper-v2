@@ -37,6 +37,7 @@ from session_capture import (
     run_logged_shell,
     session_paused,
     set_session_paused,
+    set_tool_capture,
 )
 from tools_catalog import (
     COMMON_WORDLISTS,
@@ -598,15 +599,14 @@ def retarget_nmap_on(command, nmap_file: Path):
 
 
 def tee_command(cmd: str, rel: str):
-    """Linux: cmd | tee file (unchanged). Windows cmd has no tee — redirect then type."""
+    """Linux: cmd | tee file (unchanged). Windows: raw command; logger copies to the .txt."""
     text = str(cmd or "").rstrip()
     if not text:
         return text
     if "| tee " in text or text.endswith("| tee"):
         return text
     if os.name == "nt":
-        dest = str(rel).replace("/", "\\")
-        return f'{text} > "{dest}" 2>&1 & type "{dest}"'
+        return text
     return f'{text} | tee "{rel}"'
 
 
@@ -1368,7 +1368,12 @@ def prepare_terminal_send(data):
     out.parent.mkdir(parents=True, exist_ok=True)
     abs_out = str(out.resolve())
     rel = engine.relative_path(ws, out)
-    send = tee_command(command_text, abs_out)
+    if os.name == "nt":
+        out.touch(exist_ok=True)
+        set_tool_capture(out)
+        send = command_text
+    else:
+        send = tee_command(command_text, abs_out)
     purpose = str(data.get("purpose") or "").strip() or "Sent to the logged terminal."
     description = (tool or {}).get("name") or label
     engine.save_command_record(

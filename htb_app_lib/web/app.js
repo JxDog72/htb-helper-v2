@@ -518,10 +518,7 @@
     const dest = outFile || "logs/tool.txt";
     if (!cmd) return "";
     if (cmd.includes("| tee ") || cmd.endsWith("| tee")) return cmd;
-    if (state.osName === "nt") {
-      const win = String(dest).replace(/\//g, "\\");
-      return `${cmd} > "${win}" 2>&1 & type "${win}"`;
-    }
+    if (state.osName === "nt") return cmd;
     return `${cmd} | tee "${dest}"`;
   }
 
