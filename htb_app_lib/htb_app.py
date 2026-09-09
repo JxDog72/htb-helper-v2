@@ -492,7 +492,7 @@ def preflight_payload():
     if os.name != "nt":
         add("script", shutil.which("script"), shutil.which("script") or "not on PATH (bsdutils)")
     else:
-        add("console capture", True, "Windows piped cmd (ipconfig/ping/tracert/nmap output included)")
+        add("console capture", True, "Windows ConPTY cmd (prompt/echo; ipconfig/ping/tracert/nmap logged)")
 
     shot = find_screenshot_command()
     if os.name == "nt":
@@ -1968,6 +1968,25 @@ def start_logged_shell(log_file: Path):
         compact=True,
     )
     print(f"\n[+] Session log: {log_file}")
+    if os.name == "nt":
+        from session_capture import set_inject_log
+
+        set_inject_log(log_file)
+        inner = [
+            sys.executable,
+            str(LIB / "htb_app.py"),
+            "--logged-shell",
+            str(log_file),
+            "--config",
+            str(STATE["config_path"]),
+            "--no-bootstrap",
+            "--no-browser",
+        ]
+        flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0x00000010)
+        subprocess.Popen(inner, cwd=str(STATE["workspace"]), creationflags=flags)
+        print("[+] Logged cmd opened in a NEW window — type there (prompt should work).")
+        print("[+] This window is GUI-only. Ctrl+C here stops the helper, not the lab shell.\n")
+        return
     print("[+] Work in THIS terminal. Notes / tools GUI is the browser.\n")
     run_logged_shell(log_file)
     STATE["session_active"] = False
@@ -2096,8 +2115,12 @@ def main():
         return
 
     print("[*] In the browser: open an existing lab or create a new one.")
-    print("[*] This terminal becomes the logged shell after you choose.")
-    print("[*] Do not Ctrl+C unless you want to quit the helper.")
+    if os.name == "nt":
+        print("[*] Windows: after you choose a lab, a NEW cmd window is the logged shell.")
+        print("[*] This window stays with the GUI. Ctrl+C here stops the helper.")
+    else:
+        print("[*] This terminal becomes the logged shell after you choose.")
+        print("[*] Do not Ctrl+C unless you want to quit the helper.")
     try:
         while not STATE["session_ready"].wait(timeout=0.5):
             pass

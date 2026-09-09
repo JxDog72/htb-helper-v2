@@ -1,10 +1,10 @@
 """Full-console session capture.
 
 Unix: util-linux `script` (records ping/traceroute).
-Windows: cmd.exe with stdout/stderr pipes. Start-Transcript only keeps
-PowerShell cmdlets (pwd/dir) and drops native .exe output (ipconfig, ping,
-tracert, nmap). Pipes capture that output. Ctrl+C is sent to the running
-command, not the logger.
+Windows: ConPTY cmd.exe so the shell is a real console (prompt, echo,
+ipconfig/ping/tracert/nmap). Piped cmd.exe is only a fallback — it is not
+a console, so typing and Ctrl+C can freeze. Ctrl+C goes to the running
+command; Ctrl+C twice quickly exits the logger.
 """
 
 from __future__ import annotations
@@ -23,6 +23,8 @@ _log_lock = threading.Lock()
 _log_fp = None
 _pty_master = None
 _windows_stdin = None
+_inject_log = None
+_INJECT_NAME = ".htb_inject"
 
 
 def session_paused():
@@ -68,6 +70,42 @@ def append_to_session_log(text: str) -> bool:
             return False
 
 
+def set_inject_log(log_file):
+    global _inject_log
+    _inject_log = Path(log_file) if log_file else None
+
+
+def inject_queue_path(log_file=None):
+    path = Path(log_file or _inject_log or "")
+    if not path:
+        return None
+    return path.parent / _INJECT_NAME
+
+
+def queue_windows_inject(command: str, log_file=None) -> bool:
+    dest = inject_queue_path(log_file)
+    if dest is None:
+        return False
+    try:
+        with dest.open("a", encoding="utf-8") as handle:
+            handle.write(str(command).rstrip("\r\n") + "\n")
+        return True
+    except OSError:
+        return False
+
+
+def take_windows_inject(log_file=None):
+    dest = inject_queue_path(log_file)
+    if dest is None or not dest.is_file():
+        return []
+    try:
+        text = dest.read_text(encoding="utf-8")
+        dest.write_text("", encoding="utf-8")
+    except OSError:
+        return []
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
 def inject_to_session(command: str) -> bool:
     """Type a command into the live logged shell, as if the student typed it."""
     line = str(command or "").rstrip()
@@ -76,15 +114,15 @@ def inject_to_session(command: str) -> bool:
     payload = line + "\n"
     if os.name == "nt":
         stdin = _windows_stdin
-        if stdin is None:
-            return False
-        try:
-            data = payload.replace("\n", "\r\n").encode(sys.stdout.encoding or "utf-8", errors="replace")
-            stdin.write(data)
-            stdin.flush()
-            return True
-        except Exception:
-            return False
+        if stdin is not None:
+            try:
+                data = payload.replace("\n", "\r\n").encode(sys.stdout.encoding or "utf-8", errors="replace")
+                stdin.write(data)
+                stdin.flush()
+                return True
+            except Exception:
+                pass
+        return queue_windows_inject(line)
     master = _pty_master
     if master is None:
         return False
@@ -99,8 +137,61 @@ def run_logged_shell(log_file: Path) -> int:
     log_file = Path(log_file)
     log_file.parent.mkdir(parents=True, exist_ok=True)
     if os.name == "nt":
-        return _run_windows_piped(log_file)
+        return _run_windows(log_file)
     return _run_unix(log_file)
+
+
+def _set_windows_stdin(stream):
+    global _windows_stdin
+    _windows_stdin = stream
+
+
+def _run_windows(log_file: Path) -> int:
+    set_inject_log(log_file)
+    encoding = sys.stdout.encoding or "utf-8"
+    header = (
+        f"===== HTB Helper session log (console capture) =====\n"
+        f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"Shell: {os.environ.get('COMSPEC') or r'C:\\Windows\\System32\\cmd.exe'}\n"
+        f"====================================================\n"
+    )
+    log = log_file.open("a", encoding="utf-8", errors="replace")
+    log.write(header)
+    log.flush()
+    global _log_fp
+    _pause.clear()
+    _log_fp = log
+    used_piped = False
+    try:
+        try:
+            import windows_conpty
+
+            if windows_conpty.available():
+                print("[+] Console capture is ON (ConPTY). Type normally — you should see a prompt.")
+                print("[+] Ctrl+C stops the current command. Ctrl+C twice quickly exits this logger.")
+                print("[+] Type 'exit' when the session is finished.\n")
+                return windows_conpty.run(
+                    log=log,
+                    pause_event=_pause,
+                    log_lock=_log_lock,
+                    set_stdin=_set_windows_stdin,
+                    encoding=encoding,
+                    inject_file=inject_queue_path(log_file),
+                )
+        except Exception as exc:
+            print(f"[!] ConPTY failed ({exc}). Falling back to pipes — if this window freezes, use .\\htb.cmd --gui-only")
+        used_piped = True
+        return _run_windows_piped(log_file, log=log, encoding=encoding)
+    finally:
+        if not used_piped:
+            with _log_lock:
+                try:
+                    if _log_fp is log:
+                        log.close()
+                except Exception:
+                    pass
+                _log_fp = None
+            _set_windows_stdin(None)
 
 
 def _run_unix(log_file: Path) -> int:
@@ -241,28 +332,28 @@ def _run_unix(log_file: Path) -> int:
             _log_fp = None
 
 
-def _run_windows_piped(log_file: Path) -> int:
-    """Log a real cmd.exe session, including native tools like ipconfig/ping."""
+def _run_windows_piped(log_file: Path, log=None, encoding=None) -> int:
+    """Last-resort logger: cmd.exe with pipes. Prefer ConPTY on Windows 10+."""
     import ctypes
     from ctypes import wintypes
+    import time
 
     comspec = os.environ.get("COMSPEC") or r"C:\Windows\System32\cmd.exe"
-    encoding = sys.stdout.encoding or "utf-8"
+    encoding = encoding or sys.stdout.encoding or "utf-8"
     CREATE_NEW_PROCESS_GROUP = 0x00000200
-
-    header = (
-        f"===== HTB Helper session log (console capture) =====\n"
-        f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        f"Shell: {comspec}\n"
-        f"====================================================\n"
-    )
 
     global _log_fp, _windows_stdin
     _pause.clear()
-    log = log_file.open("a", encoding="utf-8", errors="replace")
-    log.write(header)
-    log.flush()
-    _log_fp = log
+    if log is None:
+        log = log_file.open("a", encoding="utf-8", errors="replace")
+        log.write(
+            f"===== HTB Helper session log (console capture) =====\n"
+            f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"Shell: {comspec}\n"
+            f"====================================================\n"
+        )
+        log.flush()
+        _log_fp = log
     log_lock = _log_lock
 
     proc = subprocess.Popen(
@@ -299,13 +390,36 @@ def _run_windows_piped(log_file: Path) -> int:
 
     def pump_in():
         assert proc.stdin is not None
-        fd = sys.stdin.fileno()
+        try:
+            import msvcrt
+        except ImportError:
+            msvcrt = None
         while not stop.is_set() and proc.poll() is None:
             try:
-                chunk = os.read(fd, 256)
+                for line in take_windows_inject(log_file):
+                    proc.stdin.write((line + "\r\n").encode(encoding, errors="replace"))
+                    proc.stdin.flush()
+                if msvcrt is not None:
+                    if not msvcrt.kbhit():
+                        time.sleep(0.03)
+                        continue
+                    ch = msvcrt.getwch()
+                    if ch in ("\x00", "\xe0"):
+                        msvcrt.getwch()
+                        continue
+                    chunk = ch.encode(encoding, errors="replace")
+                    if ch == "\r":
+                        chunk = b"\r\n"
+                    try:
+                        sys.stdout.write(ch if ch != "\r" else "\n")
+                        sys.stdout.flush()
+                    except Exception:
+                        pass
+                else:
+                    chunk = os.read(sys.stdin.fileno(), 256)
+                    if not chunk:
+                        break
             except OSError:
-                break
-            if not chunk:
                 break
             try:
                 proc.stdin.write(chunk)
@@ -325,14 +439,31 @@ def _run_windows_piped(log_file: Path) -> int:
 
     HandlerType = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
 
+    last_ctrl = [0.0]
+
     def _ctrl(ctrl_type):
-        if ctrl_type in (0, 1):  # CTRL_C / CTRL_BREAK
+        if ctrl_type not in (0, 1):  # CTRL_C / CTRL_BREAK
+            return False
+        now = time.monotonic()
+        double = (now - last_ctrl[0]) < 1.5
+        last_ctrl[0] = now
+        try:
+            if proc.stdin:
+                proc.stdin.write(b"\x03")
+                proc.stdin.flush()
+        except Exception:
+            pass
+        try:
+            proc.send_signal(signal.CTRL_BREAK_EVENT)
+        except Exception:
+            pass
+        if double:
             try:
-                proc.send_signal(signal.CTRL_BREAK_EVENT)
+                proc.terminate()
             except Exception:
                 pass
-            return True
-        return False
+            return False
+        return True
 
     ctrl_handler = HandlerType(_ctrl)
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -340,8 +471,8 @@ def _run_windows_piped(log_file: Path) -> int:
     kernel32.SetConsoleCtrlHandler.restype = wintypes.BOOL
     kernel32.SetConsoleCtrlHandler(ctrl_handler, True)
 
-    print("[+] Console capture is ON. ipconfig / ping / tracert / nmap output is logged.")
-    print("[+] Ctrl+C stops the current command, not this logger.")
+    print("[+] Console capture is ON (pipe fallback). If keys do nothing, close this window and run .\\htb.cmd --gui-only")
+    print("[+] Ctrl+C stops the current command. Ctrl+C twice quickly exits this logger.")
     print("[+] Type 'exit' when the session is finished.\n")
 
     try:

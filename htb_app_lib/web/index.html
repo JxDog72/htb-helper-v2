@@ -329,7 +329,7 @@
             <li>In the <strong>logged terminal</strong> type <code>exit</code> (ends <code>session.log</code>).</li>
             <li>Then <kbd>Ctrl</kbd>+<kbd>C</kbd> in that same terminal to stop the GUI.</li>
           </ol>
-          <p><kbd>Ctrl</kbd>+<kbd>C</kbd> during a scan (ping, nmap, tracert) should stop <em>that command</em>, not the helper. If the GUI dies too, just start <code>./htb</code> again.</p>
+          <p><kbd>Ctrl</kbd>+<kbd>C</kbd> during a scan (ping, nmap, tracert) should stop <em>that command</em>, not the helper. On Windows, <kbd>Ctrl</kbd>+<kbd>C</kbd> twice quickly exits the logged shell if it is stuck. If the GUI dies too, just start <code>./htb</code> / <code>.\htb.cmd</code> again.</p>
 
           <h3>First install (Parrot / Kali)</h3>
           <pre class="syntax">git clone https://github.com/JxDog72/htb-helper-v2.git
@@ -361,6 +361,7 @@ python3 htb_app_lib/htb_helper.py</pre>
 .\htb.cmd --check
 .\htb.cmd --port 9000
 python htb_app_lib\htb_app.py</pre>
+          <p>On Windows, <code>.\htb.cmd</code> keeps this window for the GUI and opens a <strong>new cmd window</strong> for the logged shell (so this one cannot freeze). Type lab commands in the new window. <kbd>Ctrl</kbd>+<kbd>C</kbd> in the GUI window stops the helper.</p>
 
           <h3>Update to the latest</h3>
           <pre class="syntax">cd htb-helper-v2
@@ -442,6 +443,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=29"></script>
+  <script src="/app.js?v=30"></script>
 </body>
 </html>
