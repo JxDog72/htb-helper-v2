@@ -40,6 +40,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from urllib.parse import urlparse
 
@@ -2072,11 +2073,135 @@ def record_evidence(workspace):
 # SCREENSHOTS
 # ============================================================
 
+LINUX_SCREENSHOT_TOOLS = (
+    "scrot",
+    "grim",
+    "gnome-screenshot",
+    "xfce4-screenshooter",
+    "import",
+    "mate-screenshot",
+)
+
+
 def find_screenshot_command():
-    for command in ("gnome-screenshot", "scrot", "import"):
+    for command in LINUX_SCREENSHOT_TOOLS:
         if command_exists(command):
             return command
     return None
+
+
+def screenshot_argv(tool, dest):
+    """Argv for a Linux screenshot tool. mate-screenshot cannot take -f."""
+    dest = str(dest)
+    if tool == "gnome-screenshot":
+        return [tool, "-f", dest]
+    if tool == "scrot":
+        return [tool, dest]
+    if tool == "grim":
+        return [tool, dest]
+    if tool == "xfce4-screenshooter":
+        return [tool, "-f", "-s", dest]
+    if tool == "import":
+        return [tool, "-window", "root", dest]
+    if tool == "mate-screenshot":
+        return [tool]
+    raise RuntimeError(f"Unsupported screenshot tool: {tool}")
+
+
+def _pictures_dirs():
+    dirs = []
+    xdg = os.environ.get("XDG_PICTURES_DIR")
+    if xdg:
+        dirs.append(Path(xdg).expanduser())
+    dirs.append(Path.home() / "Pictures")
+    dirs.append(Path.home() / "Desktop")
+    seen = set()
+    out = []
+    for folder in dirs:
+        key = str(folder)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(folder)
+    return out
+
+
+def _new_image_since(folders, started, before):
+    candidates = []
+    for folder in folders:
+        if not folder.is_dir():
+            continue
+        try:
+            entries = list(folder.iterdir())
+        except OSError:
+            continue
+        for path in entries:
+            if not path.is_file() or path.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+                continue
+            try:
+                resolved = path.resolve()
+                mtime = path.stat().st_mtime
+            except OSError:
+                continue
+            if resolved in before:
+                continue
+            if mtime + 1.0 >= started:
+                candidates.append(path)
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def take_linux_screenshot(dest):
+    """Capture the display into dest. mate-screenshot saves to Pictures; we move it."""
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tool = find_screenshot_command()
+    if not tool:
+        raise RuntimeError(
+            "No screenshot utility. On Parrot: sudo apt install scrot  (or mate-utils)."
+        )
+    argv = screenshot_argv(tool, dest)
+    if tool == "mate-screenshot":
+        folders = _pictures_dirs()
+        before = set()
+        for folder in folders:
+            if not folder.is_dir():
+                continue
+            try:
+                for path in folder.iterdir():
+                    if path.is_file() and path.suffix.lower() in (".png", ".jpg", ".jpeg"):
+                        before.add(path.resolve())
+            except OSError:
+                continue
+        started = time.time()
+        result = subprocess.run(argv, check=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"{tool} failed (exit {result.returncode}).")
+        found = None
+        for _ in range(25):
+            found = _new_image_since(folders, started, before)
+            if found:
+                break
+            time.sleep(0.12)
+        if not found:
+            raise RuntimeError(
+                "mate-screenshot ran but no new image showed up in Pictures. "
+                "Install scrot for a direct save: sudo apt install scrot"
+            )
+        shutil.move(str(found), str(dest))
+    else:
+        result = subprocess.run(argv, check=False)
+        if result.returncode != 0 or not dest.exists() or dest.stat().st_size == 0:
+            if dest.exists() and dest.stat().st_size == 0:
+                try:
+                    dest.unlink()
+                except OSError:
+                    pass
+            raise RuntimeError(f"{tool} failed (exit {result.returncode}).")
+    if not dest.exists() or dest.stat().st_size == 0:
+        raise RuntimeError(f"{tool} produced an empty screenshot.")
+    return dest, tool
 
 
 def infer_milestones_from_screenshots(workspace):
@@ -2156,7 +2281,7 @@ def capture_screenshot(workspace, milestone, milestone_name, description_raw):
     command_name = find_screenshot_command()
     if not command_name:
         print("[-] No supported screenshot utility found.")
-        print("    Install gnome-screenshot, scrot, or ImageMagick.")
+        print("    Install scrot, mate-utils, gnome-screenshot, or ImageMagick.")
         return None
 
     description = safe_filename(description_raw)
@@ -2164,27 +2289,12 @@ def capture_screenshot(workspace, milestone, milestone_name, description_raw):
         description = safe_filename(milestone_name) or "screenshot"
 
     path = screenshots / f"{timestamp_seconds()}_{milestone}_{description}.png"
-    if command_name == "gnome-screenshot":
-        command = ["gnome-screenshot", "-f", str(path)]
-    elif command_name == "scrot":
-        command = ["scrot", str(path)]
-    else:
-        command = ["import", "-window", "root", str(path)]
-
+    command = screenshot_argv(command_name, path)
     save_command_record(workspace, command, "Screenshot capture", milestone_name)
     try:
-        result = subprocess.run(command, check=False)
-    except OSError as exc:
-        print(f"[-] Could not capture screenshot: {exc}")
-        return None
-
-    if result.returncode != 0 or not path.exists() or path.stat().st_size == 0:
-        print(f"[-] Screenshot capture failed with exit code {result.returncode}.")
-        if path.exists() and path.stat().st_size == 0:
-            try:
-                path.unlink()
-            except OSError:
-                pass
+        take_linux_screenshot(path)
+    except RuntimeError as exc:
+        print(f"[-] {exc}")
         return None
 
     metadata = file_metadata(workspace, path)

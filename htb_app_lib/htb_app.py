@@ -662,10 +662,9 @@ def read_log(name: str, offset: int = 0, tail: bool = False):
 
 
 def find_screenshot_command():
-    for name in ("mate-screenshot", "gnome-screenshot", "scrot", "grim", "import"):
-        if shutil.which(name):
-            return name
-    return None
+    if os.name == "nt":
+        return "powershell"
+    return engine.find_screenshot_command()
 
 
 def capture_screenshot(milestone, description):
@@ -699,22 +698,7 @@ def capture_screenshot(milestone, description):
         if result.returncode != 0 or not dest.exists() or dest.stat().st_size == 0:
             raise RuntimeError("Windows screenshot failed.")
     else:
-        cmd_name = find_screenshot_command()
-        if not cmd_name:
-            raise RuntimeError("No screenshot utility. On Parrot: sudo apt install scrot  (or mate-screenshot).")
-        if cmd_name == "gnome-screenshot":
-            command = [cmd_name, "-f", str(dest)]
-        elif cmd_name == "mate-screenshot":
-            command = [cmd_name, "-f", str(dest)]
-        elif cmd_name == "scrot":
-            command = [cmd_name, str(dest)]
-        elif cmd_name == "grim":
-            command = [cmd_name, str(dest)]
-        else:
-            command = ["import", "-window", "root", str(dest)]
-        result = subprocess.run(command, check=False)
-        if result.returncode != 0 or not dest.exists() or dest.stat().st_size == 0:
-            raise RuntimeError(f"{cmd_name} failed (exit {result.returncode}).")
+        engine.take_linux_screenshot(dest)
 
     engine.update_milestone(ws, milestone)
     engine.manifest_add(ws, "screenshots", {

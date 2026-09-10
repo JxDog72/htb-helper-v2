@@ -156,6 +156,17 @@ class ScreenshotMilestoneTests(unittest.TestCase):
             },
         )
 
+    def test_mate_screenshot_argv_has_no_dash_f(self):
+        argv = engine.screenshot_argv("mate-screenshot", "/tmp/shot.png")
+        self.assertEqual(argv[0], "mate-screenshot")
+        self.assertNotIn("-f", argv)
+        self.assertNotIn("--file", argv)
+
+    def test_gnome_and_scrot_write_dest(self):
+        dest = "/tmp/lab/shot.png"
+        self.assertEqual(engine.screenshot_argv("gnome-screenshot", dest), ["gnome-screenshot", "-f", dest])
+        self.assertEqual(engine.screenshot_argv("scrot", dest), ["scrot", dest])
+
 
 if __name__ == "__main__":
     unittest.main()
