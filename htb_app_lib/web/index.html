@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=20" />
+  <link rel="stylesheet" href="/app.css?v=21" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c9843a'/></svg>" />
 </head>
 <body>
@@ -277,6 +277,24 @@
             <h2>Validate</h2>
             <pre id="validate-out" class="console short"></pre>
             <button type="button" class="btn ghost" id="btn-validate">Run validation</button>
+            <h2>Capture milestone screenshot</h2>
+            <p class="lede">Same as <code>./htb --cli</code> option <strong>8</strong>. Grabs the primary screen into <code>screenshots/</code>, stamps notes, and marks that milestone. A 3-second countdown lets you switch to the logged terminal if that is the shot you want.</p>
+            <label>Milestone
+              <select id="shot-milestone">
+                <option value="initial_recon">Initial reconnaissance</option>
+                <option value="initial_foothold">Initial foothold</option>
+                <option value="vulnerability_evidence">Vulnerability evidence</option>
+                <option value="privilege_escalation">Privilege escalation</option>
+                <option value="user_flag">User flag</option>
+                <option value="root_admin_flag">Root/admin flag</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label>Short description
+              <input id="shot-desc" required placeholder="open port 80 banner" autocomplete="off" />
+            </label>
+            <button type="button" class="btn copper" id="btn-screenshot">Capture screenshot</button>
+            <p id="shot-out" class="quiet"></p>
           </div>
           <div>
             <h2>Export to your host</h2>
@@ -307,26 +325,6 @@
 7z a -t7z -mhe=on -p /path/to/student_machine.7z student_machine/</pre>
             <h3>Own VM (not Pwnbox)</h3>
             <p class="lede">Skip scp: enable a VirtualBox/VMware <strong>shared folder</strong>, or drag the zip/7z onto your host desktop.</p>
-          </div>
-          <div>
-            <h2>Capture milestone screenshot</h2>
-            <p class="lede">Same as <code>./htb --cli</code> option <strong>8</strong>. Grabs the primary screen into <code>screenshots/</code>, stamps notes, and marks that milestone. A 3-second countdown lets you switch to the logged terminal if that is the shot you want.</p>
-            <label>Milestone
-              <select id="shot-milestone">
-                <option value="initial_recon">Initial reconnaissance</option>
-                <option value="initial_foothold">Initial foothold</option>
-                <option value="vulnerability_evidence">Vulnerability evidence</option>
-                <option value="privilege_escalation">Privilege escalation</option>
-                <option value="user_flag">User flag</option>
-                <option value="root_admin_flag">Root/admin flag</option>
-                <option value="other">Other</option>
-              </select>
-            </label>
-            <label>Short description
-              <input id="shot-desc" required placeholder="open port 80 banner" autocomplete="off" />
-            </label>
-            <button type="button" class="btn copper" id="btn-screenshot">Capture screenshot</button>
-            <p id="shot-out" class="quiet"></p>
           </div>
         </div>
       </section>

@@ -192,6 +192,8 @@ main { overflow: hidden; min-width: 0; }
   padding: 0.28rem 0; border-bottom: 1px solid #0c2818;
 }
 .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+.status-grid h2 + .lede { margin-top: 0.35rem; }
+.status-grid button + h2 { margin-top: 1.5rem; }
 .ticks { list-style: none; padding: 0; }
 .ticks li { padding: 0.2rem 0; border-bottom: 1px solid #0c2818; }
 kbd {
