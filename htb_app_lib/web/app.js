@@ -969,11 +969,39 @@
         if (data.notes != null) applyNotesText(data.notes);
         $("tool-out").textContent += "\n[sent to logged terminal]\n" + (data.send_command || cmd) + "\n";
         if (data.output_file) $("tool-out").textContent += "[capture] " + data.output_file + "\n";
+        if (data.pending_id) {
+          $("tool-out").textContent += "[notes] waiting for the command to finish so findings can be parsed\n";
+          pollPendingNotes(data.pending_id);
+        }
         $("tool-out").scrollTop = $("tool-out").scrollHeight;
       } catch (err) {
         alert(err.message);
       }
     });
+    async function pollPendingNotes(pendingId) {
+      const deadline = Date.now() + 45 * 60 * 1000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 1000));
+        try {
+          const data = await api(`/api/tools/pending?id=${encodeURIComponent(pendingId)}`);
+          if (!data.done) continue;
+          if (data.notes != null && !state.dirty) applyNotesText(data.notes);
+          if (data.error) {
+            $("tool-out").textContent += `[findings] ${data.error}\n`;
+          } else if (data.summary) {
+            $("tool-out").textContent += `[findings] ${data.summary}\n`;
+          } else {
+            $("tool-out").textContent += "[findings] parsed\n";
+          }
+          $("tool-out").scrollTop = $("tool-out").scrollHeight;
+          return;
+        } catch (err) {
+          $("tool-out").textContent += `[findings] ${err.message}\n`;
+          $("tool-out").scrollTop = $("tool-out").scrollHeight;
+          return;
+        }
+      }
+    }
     function onToolFieldsChanged(e) {
       if (state.applyingPreview) return;
       const id = e.target && e.target.id;
@@ -1193,6 +1221,38 @@
         showExport(data, $("zip7-out"), true);
       } catch (err) {
         $("zip7-out").textContent = err.message;
+      }
+    });
+    if ($("btn-screenshot")) $("btn-screenshot").addEventListener("click", async () => {
+      const description = ($("shot-desc").value || "").trim();
+      if (!description) {
+        $("shot-out").textContent = "Description is required.";
+        return;
+      }
+      const btn = $("btn-screenshot");
+      btn.disabled = true;
+      try {
+        for (let n = 3; n > 0; n -= 1) {
+          $("shot-out").textContent = `Capturing in ${n}… switch to the terminal if that is the shot you want.`;
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+        $("shot-out").textContent = "Capturing…";
+        const data = await api("/api/screenshot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            milestone: $("shot-milestone").value,
+            description,
+          }),
+        });
+        $("shot-out").textContent = "Saved " + (data.file || "screenshot");
+        if (data.notes != null && !state.dirty) applyNotesText(data.notes);
+        refreshFiles().catch(() => {});
+        refreshStatus().catch(() => {});
+      } catch (err) {
+        $("shot-out").textContent = err.message;
+      } finally {
+        btn.disabled = false;
       }
     });
     $("btn-bootstrap").addEventListener("click", async () => {

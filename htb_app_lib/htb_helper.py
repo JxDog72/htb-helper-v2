@@ -19,7 +19,7 @@ Design goals:
     - Do not automate exploitation or privilege escalation.
 
 Supported automatic note parsers include:
-    Nmap, Gobuster, ffuf, Feroxbuster, dirsearch, Nikto, WhatWeb,
+    Nmap, ping, Gobuster, ffuf, Feroxbuster, dirsearch, Nikto, WhatWeb,
     httpx, nuclei, dig, nslookup, enum4linux/enum4linux-ng,
     smbclient, rpcclient, ldapsearch, NetExec/CrackMapExec, curl,
     wget, and generic commands.
@@ -48,6 +48,16 @@ APP_NAME = "HTB Enterprise Research Study Helper"
 APP_VERSION = "3.4.0"
 MAX_ANALYSIS_CHARS = 2_000_000
 MAX_NOTE_FINDINGS = 25
+ANSI_RE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|].*?(?:\x07|\x1b\\))")
+SCREENSHOT_MILESTONES = {
+    "initial_recon": "Initial reconnaissance",
+    "initial_foothold": "Initial foothold",
+    "vulnerability_evidence": "Vulnerability evidence",
+    "privilege_escalation": "Privilege escalation",
+    "user_flag": "User flag",
+    "root_admin_flag": "Root/admin flag",
+    "other": "Other",
+}
 
 
 # ============================================================
@@ -147,6 +157,10 @@ def unique_preserve(values):
             seen.add(key)
             result.append(value)
     return result
+
+
+def strip_ansi(text):
+    return ANSI_RE.sub("", str(text or ""))
 
 
 def read_multiline(prompt, *, end_marker=".done", allow_empty=False):
@@ -844,6 +858,10 @@ TOOL_ALIASES = {
     "sqlmap": "sqlmap",
     "sqlmap.py": "sqlmap",
     "dalfox": "dalfox",
+    "ping": "ping",
+    "tracert": "traceroute",
+    "traceroute": "traceroute",
+    "tracepath": "traceroute",
 }
 
 TOOL_CATEGORIES = {
@@ -867,6 +885,8 @@ TOOL_CATEGORIES = {
     "wget": "ENUMERATION",
     "sqlmap": "ENUMERATION",
     "dalfox": "ENUMERATION",
+    "ping": "RECON",
+    "traceroute": "RECON",
     "generic": "OTHER",
 }
 
@@ -890,12 +910,26 @@ def classify_tool_category(tool, command=None):
     return TOOL_CATEGORIES.get(tool, "OTHER")
 
 
+def _tool_basename(name):
+    name = Path(str(name or "")).name.lower()
+    if name.endswith((".exe", ".bat", ".cmd", ".bin")):
+        name = Path(name).stem.lower()
+    return name
+
+
 def identify_tool(command):
     if not command:
         return "generic"
-    name = Path(command[0]).name.lower()
+    if isinstance(command, str):
+        try:
+            command = shlex.split(command, posix=(os.name != "nt"))
+        except ValueError:
+            command = str(command).split()
+        if not command:
+            return "generic"
+    name = _tool_basename(command[0])
     if name in ("python", "python3", "python2") and len(command) > 1:
-        name = Path(command[1]).name.lower()
+        name = _tool_basename(command[1])
     return TOOL_ALIASES.get(name, "generic")
 
 
@@ -964,6 +998,158 @@ def nmap_findings_for_notes(parsed):
             f"{item['state']} {sanitize_note_text(item['service'], 250)}"
         )
     return notes
+
+
+def parse_ping_output(output):
+    """Brief ICMP stats from Windows ping.exe or Unix ping. Never dumps every reply."""
+    findings = []
+    text = strip_ansi(output or "")
+    win = re.search(
+        r"Ping statistics for ([^\r\n:]+):\s*"
+        r"Packets: Sent = (\d+), Received = (\d+), Lost = (\d+) \((\d+)% loss\)",
+        text,
+        re.I,
+    )
+    if win:
+        host, sent, recv, lost, loss = win.groups()
+        findings.append(
+            f"{host.strip()} ICMP: {recv}/{sent} received, {lost} lost ({loss}% loss)"
+        )
+        rtt = re.search(
+            r"Minimum = (\d+)ms, Maximum = (\d+)ms, Average = (\d+)ms",
+            text,
+            re.I,
+        )
+        if rtt:
+            findings.append(
+                f"Round trip: min {rtt.group(1)}ms, max {rtt.group(2)}ms, avg {rtt.group(3)}ms"
+            )
+        if int(recv) == 0:
+            findings.append("No ICMP replies (host down, filtered, or ICMP blocked).")
+        return unique_preserve(findings)[:MAX_NOTE_FINDINGS]
+
+    unix = re.search(
+        r"(\d+) packets transmitted, (\d+) (?:packets )?received,.*?(\d+(?:\.\d+)?)% packet loss",
+        text,
+        re.I,
+    )
+    if unix:
+        sent, recv, loss = unix.groups()
+        dest_match = re.search(r"^PING\s+(\S+)", text, re.M)
+        label = dest_match.group(1) if dest_match else "target"
+        findings.append(f"{label} ICMP: {recv}/{sent} received, {loss}% loss")
+        rtt = re.search(
+            r"min/avg/max[^=]*=\s*([\d.]+)/([\d.]+)/([\d.]+)",
+            text,
+            re.I,
+        )
+        if rtt:
+            findings.append(
+                f"Round trip: min {rtt.group(1)}ms, avg {rtt.group(2)}ms, max {rtt.group(3)}ms"
+            )
+        if float(loss) >= 100 or int(recv) == 0:
+            findings.append("No ICMP replies (host down, filtered, or ICMP blocked).")
+        return unique_preserve(findings)[:MAX_NOTE_FINDINGS]
+
+    if re.search(r"(?i)could not find host|unknown host|Name or service not known", text):
+        findings.append("Ping could not resolve the host name.")
+    elif re.search(r"(?i)Destination host unreachable", text):
+        findings.append("Destination host unreachable.")
+    elif re.search(r"(?i)Request timed out|100%\s*(packet )?loss", text):
+        findings.append("No ICMP replies.")
+    return unique_preserve(findings)[:MAX_NOTE_FINDINGS]
+
+
+def capture_output_complete(tool, output):
+    """True when a capture file looks finished enough to parse."""
+    text = strip_ansi(output or "")
+    if not text.strip():
+        return False
+    if tool == "ping":
+        return bool(re.search(
+            r"(?i)Ping statistics for|packets transmitted|could not find host|unknown host",
+            text,
+        ))
+    if tool == "nmap":
+        return bool(re.search(r"(?i)#?\s*Nmap done at", text))
+    if tool == "traceroute":
+        return bool(re.search(r"(?i)Trace complete|traceroute to ", text))
+    return False
+
+
+def patch_tool_note_findings(notes_text, output_rel, summary, findings):
+    """Fill parser findings into the last send-to-terminal stamp for this capture file."""
+    text = notes_text or ""
+    marker = str(output_rel or "").strip()
+    if not marker:
+        return text, False
+    idx = text.rfind(marker)
+    if idx < 0:
+        slash = marker.replace("\\", "/")
+        idx = text.rfind(slash)
+        if idx < 0:
+            return text, False
+    stamp_starts = [m.start() for m in re.finditer(r"(?m)^\[\d{2}:\d{2}\]", text)]
+    block_start = 0
+    for start in stamp_starts:
+        if start <= idx:
+            block_start = start
+        else:
+            break
+    next_starts = [s for s in stamp_starts if s > block_start]
+    block_end = next_starts[0] if next_starts else len(text)
+    block = text[block_start:block_end]
+    clean_summary = sanitize_note_text(summary, 700) if summary else ""
+    clean_findings = []
+    for finding in findings or []:
+        cleaned = sanitize_note_text(finding, 700)
+        if cleaned:
+            clean_findings.append(cleaned)
+    clean_findings = unique_preserve(clean_findings)[:MAX_NOTE_FINDINGS]
+    findings_md = ""
+    if clean_findings:
+        findings_md = "- Findings:\n" + "".join(f"  - {item}\n" for item in clean_findings)
+
+    new_block = block
+    if clean_summary:
+        if re.search(r"(?m)^- Summary: ", new_block):
+            new_block = re.sub(
+                r"(?m)^- Summary: .*$",
+                f"- Summary: {clean_summary}",
+                new_block,
+                count=1,
+            )
+        else:
+            new_block = re.sub(
+                r"(?m)^(- Why: .*\n)",
+                r"\1" + f"- Summary: {clean_summary}\n",
+                new_block,
+                count=1,
+            ) if re.search(r"(?m)^- Why: ", new_block) else (
+                new_block.rstrip() + f"\n- Summary: {clean_summary}\n"
+            )
+
+    if re.search(r"(?m)^- Findings:", new_block):
+        new_block = re.sub(
+            r"(?ms)^- Findings:\n(?:  - .*\n)*",
+            findings_md,
+            new_block,
+            count=1,
+        )
+    elif findings_md:
+        if re.search(r"(?m)^- Output: ", new_block):
+            new_block = re.sub(
+                r"(?m)^- Output: ",
+                findings_md + "- Output: ",
+                new_block,
+                count=1,
+            )
+        else:
+            new_block = new_block.rstrip() + "\n" + findings_md
+
+    if new_block == block:
+        return text, False
+    return text[:block_start] + new_block + text[block_end:], True
 
 
 def parse_gobuster_output(output):
@@ -1160,6 +1346,7 @@ def parse_dalfox_output(output):
 
 def analyze_tool_output(tool, output, returncode):
     """Generate a conservative summary. Never claim exploitation success."""
+    output = strip_ansi(output or "")
     nonempty_lines = [line for line in output.splitlines() if line.strip()]
     error_lines = [
         line for line in nonempty_lines
@@ -1176,6 +1363,16 @@ def analyze_tool_output(tool, output, returncode):
         else:
             summary = "Nmap completed; no structured host/service findings were parsed from the captured output."
         return summary, findings, {"parsed": parsed}
+
+    if tool == "ping":
+        findings = parse_ping_output(output)
+        if findings:
+            summary = findings[0]
+        elif returncode == 0:
+            summary = "ping completed; no structured ICMP stats were parsed from the captured output."
+        else:
+            summary = f"ping exited with code {returncode}; the failed/partial output was preserved."
+        return summary, findings, {"parser": "ping"}
 
     parser_map = {
         "gobuster": parse_gobuster_output,
@@ -1919,14 +2116,18 @@ def milestone_label(milestone):
 
 
 def screenshot_category():
+    order = [
+        "initial_recon",
+        "initial_foothold",
+        "vulnerability_evidence",
+        "privilege_escalation",
+        "user_flag",
+        "root_admin_flag",
+        "other",
+    ]
     categories = {
-        "1": ("initial_recon", "Initial reconnaissance"),
-        "2": ("initial_foothold", "Initial foothold"),
-        "3": ("vulnerability_evidence", "Vulnerability evidence"),
-        "4": ("privilege_escalation", "Privilege escalation"),
-        "5": ("user_flag", "User flag"),
-        "6": ("root_admin_flag", "Root/admin flag"),
-        "7": ("other", "Other"),
+        str(i): (key, SCREENSHOT_MILESTONES[key])
+        for i, key in enumerate(order, start=1)
     }
     print("\nScreenshot milestone:")
     for key, value in categories.items():

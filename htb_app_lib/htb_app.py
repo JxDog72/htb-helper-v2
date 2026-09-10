@@ -27,6 +27,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 import webbrowser
 
 import htb_helper as engine
@@ -69,6 +70,7 @@ STATE = {
     "notes_lock": threading.Lock(),
     "configured_event": threading.Event(),
     "session_ready": threading.Event(),
+    "pending_captures": {},
 }
 
 
@@ -670,10 +672,17 @@ def capture_screenshot(milestone, description):
     ws = STATE["workspace"]
     if not ws:
         raise RuntimeError("Workspace is not configured yet.")
+    milestone = str(milestone or "").strip()
+    if milestone not in engine.SCREENSHOT_MILESTONES:
+        raise RuntimeError("Pick a screenshot milestone.")
+    description_raw = str(description or "").strip()
+    if not description_raw:
+        raise RuntimeError("Description cannot be empty.")
     screenshots = engine.screenshots_dir(ws)
     screenshots.mkdir(parents=True, exist_ok=True)
-    description = engine.safe_filename(description) or "screenshot"
+    description = engine.safe_filename(description_raw) or "screenshot"
     dest = screenshots / f"{engine.timestamp_seconds()}_{engine.safe_filename(milestone)}_{description}.png"
+    milestone_name = engine.SCREENSHOT_MILESTONES[milestone]
 
     if os.name == "nt":
         ps = (
@@ -711,15 +720,16 @@ def capture_screenshot(milestone, description):
     engine.manifest_add(ws, "screenshots", {
         "time": human_ts(),
         "milestone": milestone,
-        "description": description,
+        "milestone_name": milestone_name,
+        "description": description_raw,
         "file": engine.file_metadata(ws, dest),
     })
     engine.append_timeline_note(
         ws,
-        "NONE",
-        f"Screenshot: {description}",
+        "EVIDENCE",
+        f"Captured {milestone_name.lower()} screenshot: {description_raw}",
         compact=True,
-        metadata={"milestone": milestone},
+        metadata={"event": "milestone_screenshot", "milestone": milestone},
     )
     return engine.relative_path(ws, dest)
 
@@ -1334,6 +1344,101 @@ def spawn_logged_terminal():
     raise RuntimeError(last_err)
 
 
+def _pending_timeout(tool):
+    if tool == "ping":
+        return 120
+    if tool == "traceroute":
+        return 180
+    if tool == "nmap":
+        return 45 * 60
+    return 10 * 60
+
+
+def _read_capture_text(paths):
+    chunks = []
+    for path in paths:
+        if not path:
+            continue
+        try:
+            p = Path(path)
+            if p.is_file():
+                chunks.append(p.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            continue
+    return engine.strip_ansi("\n".join(chunks))
+
+
+def _watch_terminal_capture(pending_id, command, txt_path, nmap_path, output_rel):
+    tool = engine.identify_tool(command)
+    deadline = time.time() + _pending_timeout(tool)
+    last_size = -1
+    stable = 0
+    output = ""
+    try:
+        while time.time() < deadline:
+            output = _read_capture_text([nmap_path, txt_path])
+            size = len(output)
+            complete = engine.capture_output_complete(tool, output)
+            if size == last_size and size > 0:
+                stable += 1
+            else:
+                stable = 0
+            last_size = size
+            if complete and (stable >= 1 or tool in ("ping", "nmap", "traceroute")):
+                if complete and tool in ("ping", "nmap") and stable < 1:
+                    time.sleep(0.4)
+                    output = _read_capture_text([nmap_path, txt_path])
+                break
+            time.sleep(0.5)
+        else:
+            STATE["pending_captures"][pending_id] = {
+                "done": True,
+                "error": "Timed out waiting for terminal output to finish.",
+                "notes": read_notes(),
+            }
+            return
+        summary, findings, _meta = engine.analyze_tool_output(tool, output, 0)
+        changed = False
+        with STATE["notes_lock"]:
+            current = read_notes()
+            updated, changed = engine.patch_tool_note_findings(
+                current, output_rel, summary, findings,
+            )
+            if changed:
+                path = notes_path()
+                if path:
+                    path.write_text(updated, encoding="utf-8")
+        try:
+            clear_tool_capture()
+        except Exception:
+            pass
+        STATE["pending_captures"][pending_id] = {
+            "done": True,
+            "notes": read_notes(),
+            "summary": summary,
+            "findings": findings,
+            "changed": changed,
+        }
+    except Exception as exc:
+        STATE["pending_captures"][pending_id] = {
+            "done": True,
+            "error": str(exc),
+            "notes": read_notes(),
+        }
+
+
+def schedule_terminal_findings(command, txt_path, nmap_path, output_rel):
+    pending_id = uuid.uuid4().hex[:12]
+    STATE["pending_captures"][pending_id] = {"done": False}
+    thread = threading.Thread(
+        target=_watch_terminal_capture,
+        args=(pending_id, command, txt_path, nmap_path, output_rel),
+        daemon=True,
+    )
+    thread.start()
+    return pending_id
+
+
 def prepare_terminal_send(data):
     """Unique .txt (and .nmap) plus optional notes, then a line to type into the shell."""
     ws = STATE["workspace"]
@@ -1358,22 +1463,25 @@ def prepare_terminal_send(data):
     else:
         first = command_text.split()[0] if command_text.split() else "command"
         label = Path(first).name
+    nmap_abs = None
     if "nmap" in label.lower() or command_text.lower().startswith("nmap "):
-        nmap_file = unique_capture_path("nmap_scan", ".nmap").resolve()
+        nmap_abs = unique_capture_path("nmap_scan", ".nmap").resolve()
         try:
             parts = shlex.split(command_text, posix=(os.name != "nt"))
-            command_text = format_command(retarget_nmap_on(parts, nmap_file))
+            command_text = format_command(retarget_nmap_on(parts, nmap_abs))
         except ValueError:
             pass
     include_txt = True if "include_txt" not in data else _truthy(data.get("include_txt"))
     rel = None
+    txt_abs = None
     send = command_text
     if os.name == "nt" and not include_txt:
         clear_tool_capture()
     if include_txt:
         out = unique_capture_path(label, ".txt")
         out.parent.mkdir(parents=True, exist_ok=True)
-        abs_out = str(out.resolve())
+        txt_abs = out.resolve()
+        abs_out = str(txt_abs)
         rel = engine.relative_path(ws, out)
         if os.name == "nt":
             out.touch(exist_ok=True)
@@ -1394,6 +1502,7 @@ def prepare_terminal_send(data):
     include_command = _truthy(data.get("include_command")) if "include_command" in data else True
     include_findings = _truthy(data.get("include_findings")) if "include_findings" in data else True
     notes_text = None
+    pending_id = None
     if include_notes:
         with STATE["notes_lock"]:
             engine.append_timeline_note(
@@ -1404,14 +1513,16 @@ def prepare_terminal_send(data):
                 command=send if include_command else None,
                 purpose=purpose,
                 evidence=[rel] if rel else None,
-                findings=(
-                    [f"Capture file: {rel}. Review the terminal output for findings."]
-                    if include_findings and rel else None
-                ),
+                findings=None,
                 include_command=include_command,
-                include_findings=include_findings,
+                include_findings=False,
             )
         notes_text = read_notes()
+        marker = rel or (engine.relative_path(ws, nmap_abs) if nmap_abs else None)
+        if include_findings and marker and (txt_abs or nmap_abs):
+            pending_id = schedule_terminal_findings(
+                command_text, txt_abs, nmap_abs, marker,
+            )
     return {
         "ok": True,
         "send_command": send,
@@ -1419,6 +1530,7 @@ def prepare_terminal_send(data):
         "output_file": rel,
         "copy_command": send,
         "notes": notes_text,
+        "pending_id": pending_id,
     }
 
 
@@ -1591,6 +1703,13 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/wordlists":
                 self._json({"wordlists": existing_wordlists()})
                 return
+            if path == "/api/tools/pending":
+                pending_id = (query.get("id") or [""])[0]
+                item = STATE["pending_captures"].get(pending_id)
+                if not item:
+                    raise RuntimeError("No pending capture for that id.")
+                self._json({"ok": True, **item})
+                return
         except Exception as exc:
             self._json({"error": str(exc)}, 400)
             return
@@ -1761,9 +1880,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/screenshot":
                 rel = capture_screenshot(
                     data.get("milestone") or "other",
-                    data.get("description") or "screenshot",
+                    data.get("description") or "",
                 )
-                self._json({"ok": True, "file": rel})
+                self._json({"ok": True, "file": rel, "notes": read_notes()})
                 return
 
             if path == "/api/validate":

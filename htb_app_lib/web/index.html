@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=19" />
+  <link rel="stylesheet" href="/app.css?v=20" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c9843a'/></svg>" />
 </head>
 <body>
@@ -169,7 +169,7 @@
               <div id="tool-notes-extra" class="notes-opts hidden">
                 <label class="check"><input type="checkbox" id="tool-notes-cmd" checked /> Include full command syntax</label>
                 <label class="check"><input type="checkbox" id="tool-notes-findings" checked /> Include summary of findings</label>
-                <p class="quiet">Command is the exact line that ran. Findings are the parser summary (open ports, paths, injection points) — not a full dump of the capture file.</p>
+                <p class="quiet">Command is the exact line that ran. Findings are the parser summary (open ports, ICMP stats, paths) — not a full dump of the capture file. <strong>Send to terminal</strong> fills findings after the command finishes.</p>
               </div>
               <div class="row wrap">
                 <button type="button" class="btn copper" id="btn-tool-send">Send to terminal</button>
@@ -309,14 +309,24 @@
             <p class="lede">Skip scp: enable a VirtualBox/VMware <strong>shared folder</strong>, or drag the zip/7z onto your host desktop.</p>
           </div>
           <div>
-            <h2>Hotkeys</h2>
-            <ul class="ticks">
-              <li><kbd>Ctrl</kbd>+<kbd>S</kbd> save notes</li>
-              <li><kbd>Ctrl</kbd>+<kbd>N</kbd> stamp a heading at the cursor</li>
-              <li><kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>9</kbd> switch sections</li>
-              <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> append quick add</li>
-              <li>OS launcher: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>H</kbd> after install</li>
-            </ul>
+            <h2>Capture milestone screenshot</h2>
+            <p class="lede">Same as <code>./htb --cli</code> option <strong>8</strong>. Grabs the primary screen into <code>screenshots/</code>, stamps notes, and marks that milestone. A 3-second countdown lets you switch to the logged terminal if that is the shot you want.</p>
+            <label>Milestone
+              <select id="shot-milestone">
+                <option value="initial_recon">Initial reconnaissance</option>
+                <option value="initial_foothold">Initial foothold</option>
+                <option value="vulnerability_evidence">Vulnerability evidence</option>
+                <option value="privilege_escalation">Privilege escalation</option>
+                <option value="user_flag">User flag</option>
+                <option value="root_admin_flag">Root/admin flag</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label>Short description
+              <input id="shot-desc" required placeholder="open port 80 banner" autocomplete="off" />
+            </label>
+            <button type="button" class="btn copper" id="btn-screenshot">Capture screenshot</button>
+            <p id="shot-out" class="quiet"></p>
           </div>
         </div>
       </section>
@@ -404,7 +414,7 @@ git pull
           <p>New labs already have the report template in <code>report/report.md</code>. Recording evidence auto-appends that E-ID (with time) under Findings, newest at the bottom. <strong>Insert findings</strong> adds any missing IDs the same way. <strong>Example</strong> opens a sample write-up in a new tab and does not change your file. <strong>Reset template</strong> replaces the whole draft.</p>
 
           <h3>Validation [WARN] user_flag</h3>
-          <p>That is <em>not</em> asking you to type <code>user_flag</code> in notes. It only means you have not recorded a <strong>user-flag screenshot</strong> yet (Status → or Evidence / screenshot). WARN here is a reminder, not a failure. Same for root_admin_flag and other screenshot milestones.</p>
+          <p>That is <em>not</em> asking you to type <code>user_flag</code> in notes. It only means you have not recorded a <strong>user-flag screenshot</strong> yet (Status → Capture milestone screenshot). WARN here is a reminder, not a failure. Same for root_admin_flag and other screenshot milestones.</p>
 
           <h3>Pause / resume session logging</h3>
           <p>Header → <strong>Session ▾</strong> → Pause or Resume. The terminal still works while paused; commands are not written to <code>session.log</code> until you resume. Requires <code>./htb</code> (not <code>--gui-only</code>).</p>
@@ -444,6 +454,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=34"></script>
+  <script src="/app.js?v=35"></script>
 </body>
 </html>

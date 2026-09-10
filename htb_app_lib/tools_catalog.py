@@ -13,7 +13,7 @@ TOOL_GROUPS = [
                 "kind": "nmap",
                 "nmap_args": ["-Pn", "-sV"],
                 "summary": "nmap -Pn -sV TARGET — skip host discovery, top 1000 TCP ports (nmap default).",
-                "purpose": "Identify reachable services and versions. -Pn treats the host as up (HTB often drops ICMP).",
+                "purpose": "Identify reachable services and versions.",
             },
             {
                 "id": "nmap-port",
