@@ -26,6 +26,8 @@ author is **not responsible** for damage, data loss, misuse, or attacks.
 You are solely responsible for staying in scope and following HTB rules
 and the law.
 
+[![GUI + CLI quick start](https://raw.githubusercontent.com/JxDog72/htb-helper-v2/screenshots/gui-cli-info-img.jpg)](https://raw.githubusercontent.com/JxDog72/htb-helper-v2/screenshots/gui-cli-info-img.jpg)
+
 ![Notes view](https://raw.githubusercontent.com/JxDog72/htb-helper-v2/screenshots/mainNotes.png)
 
 ![Tools](https://raw.githubusercontent.com/JxDog72/htb-helper-v2/screenshots/toolUse.png)
