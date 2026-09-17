@@ -346,16 +346,24 @@ def default_report_text(config, suggestions=None):
         "",
         "## Executive Summary",
         "",
+        "_A short, non-technical overview of what was tested and found. Delete this line and write yours._",
         "",
         "## Scope",
         "",
-        f"This report covers the authorized HTB machine **{machine}** at `{target}`",
-        f"(assigned port: `{port}`). Testing was limited to that host and the engagement rules.",
+        "_The target machine, IP address, and dates of testing._",
+        "",
+        f"**Machine:** {machine}  ",
+        f"**Target:** `{target}`  ",
+        f"**Assigned port:** `{port}`  ",
+        "**Dates:** ",
         "",
         "## Methodology",
         "",
+        "_The general approach you followed, phase by phase._",
         "",
         "## Findings",
+        "",
+        "_Each vulnerability found, with description, evidence, severity, and how it was confirmed._",
         "",
     ]
     if suggestions:
@@ -370,14 +378,17 @@ def default_report_text(config, suggestions=None):
     else:
         lines.append("")
     lines.extend([
-        "## Attack narrative",
+        "## Attack Narrative",
         "",
+        "_A step by step account of how you moved from initial access to the final flag._",
         "",
         "## Remediation",
         "",
+        "_Practical recommendations to fix each finding._",
         "",
         "## Conclusion",
         "",
+        "_A brief closing summary._",
         "",
     ])
     return "\n".join(lines) + "\n"

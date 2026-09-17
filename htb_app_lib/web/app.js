@@ -1,5 +1,43 @@
 (() => {
-  const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "convert", "status", "help", "lab"];
+  const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "convert", "status", "ctf", "help", "lab", "settings"];
+  const SETTINGS_KEY = "htb-settings";
+  const THEMES = [
+    { id: "field", name: "Field notebook", blurb: "Copper on dark paper (default)" },
+    { id: "phosphor", name: "Phosphor", blurb: "Green terminal on black" },
+    { id: "midnight", name: "Midnight", blurb: "Navy and ice blue" },
+    { id: "slate", name: "Slate", blurb: "Steel gray, low glare" },
+    { id: "ember", name: "Ember", blurb: "Red-amber ICS night" },
+    { id: "arctic", name: "Arctic", blurb: "High-contrast cyan" },
+    { id: "custom", name: "Custom", blurb: "Pick your own colors" },
+  ];
+  const DEFAULT_CUSTOM = {
+    chassis: "#14110d",
+    text: "#efe6d4",
+    copper: "#c9843a",
+    copperHot: "#e2a45a",
+    paper: "#f1e6c8",
+    ink: "#231910",
+    console: "#0e140f",
+  };
+  const CUSTOM_CSS_KEYS = [
+    "chassis", "panel", "rail", "rule", "paper", "paper-edge", "ink", "muted-ink",
+    "copper", "copper-hot", "signal", "warn", "rec", "quiet", "console", "phosphor",
+    "blue", "text", "btn-bg", "input-bg", "header-from", "header-to", "rail-active-bg",
+    "tape-bg", "tape-line", "paper-pre", "paper-pre-fg", "paper-code", "paper-link",
+    "on-accent", "overlay", "tick-rule", "error-text",
+  ];
+  const DEFAULT_SETTINGS = {
+    theme: "field",
+    speedUp: false,
+    notesView: "split",
+    startTab: "help",
+    logLive: true,
+    includeToolNotes: false,
+    includeToolCmd: true,
+    includeToolFindings: true,
+    defaultCategory: "NONE",
+    customColors: DEFAULT_CUSTOM,
+  };
   const CATS = ["NONE", "RECON", "ENUMERATION", "FINDING", "DEAD END", "FOOTHOLD", "PRIVESC", "FLAG", "TOOL", "OTHER"];
 
   const $ = (id) => document.getElementById(id);
@@ -22,6 +60,175 @@
     lastOutFile: "",
     osName: "",
   };
+
+  const THEME_SWATCH = {
+    field: ["#14110d", "#c9843a", "#f1e6c8"],
+    phosphor: ["#07110b", "#3dff7a", "#d7f0d0"],
+    midnight: ["#0b1220", "#5b8def", "#e8eef8"],
+    slate: ["#1a1d21", "#a8b3c2", "#eceff3"],
+    ember: ["#140b0a", "#e85d3a", "#f6e4d4"],
+    arctic: ["#0a1214", "#2ee6d6", "#e8f7f6"],
+    custom: ["#2a2a2a", "#c9843a", "#efe6d4"],
+  };
+
+  function parseHex(h) {
+    let s = String(h || "").replace("#", "").trim();
+    if (s.length === 3) s = s[0] + s[0] + s[1] + s[1] + s[2] + s[2];
+    if (!/^[0-9a-fA-F]{6}$/.test(s)) return { r: 20, g: 17, b: 13 };
+    return { r: parseInt(s.slice(0, 2), 16), g: parseInt(s.slice(2, 4), 16), b: parseInt(s.slice(4, 6), 16) };
+  }
+  function rgbHex(r, g, b) {
+    const c = (n) => Math.max(0, Math.min(255, n | 0)).toString(16).padStart(2, "0");
+    return "#" + c(r) + c(g) + c(b);
+  }
+  function mixHex(a, b, t) {
+    const pa = parseHex(a), pb = parseHex(b);
+    const m = (x, y) => Math.round(x + (y - x) * t);
+    return rgbHex(m(pa.r, pb.r), m(pa.g, pb.g), m(pa.b, pb.b));
+  }
+  function luma(h) {
+    const p = parseHex(h);
+    return (p.r * 299 + p.g * 587 + p.b * 114) / 1000;
+  }
+  function deriveCustomTheme(raw) {
+    const c = Object.assign({}, DEFAULT_CUSTOM, raw || {});
+    const chassis = c.chassis, text = c.text, copper = c.copper;
+    const hot = c.copperHot || c["copper-hot"] || DEFAULT_CUSTOM.copperHot;
+    const paper = c.paper, ink = c.ink, consoleBg = c.console;
+    const dark = luma(chassis) < 140;
+    return {
+      chassis,
+      panel: mixHex(chassis, text, dark ? 0.08 : 0.1),
+      rail: mixHex(chassis, "#000000", 0.28),
+      rule: mixHex(copper, chassis, 0.55),
+      paper,
+      "paper-edge": mixHex(paper, ink, 0.22),
+      ink,
+      "muted-ink": mixHex(ink, paper, 0.42),
+      copper,
+      "copper-hot": hot,
+      signal: hot,
+      warn: "#c45c3e",
+      rec: copper,
+      quiet: mixHex(text, chassis, 0.42),
+      console: consoleBg,
+      phosphor: mixHex(hot, "#ffffff", 0.28),
+      blue: hot,
+      text,
+      "btn-bg": mixHex(chassis, text, 0.12),
+      "input-bg": mixHex(chassis, "#000000", 0.18),
+      "header-from": mixHex(chassis, text, 0.07),
+      "header-to": chassis,
+      "rail-active-bg": mixHex(chassis, copper, 0.16),
+      "tape-bg": mixHex(chassis, "#000000", 0.16),
+      "tape-line": mixHex(copper, chassis, 0.55),
+      "paper-pre": mixHex(ink, paper, 0.12),
+      "paper-pre-fg": paper,
+      "paper-code": mixHex(paper, ink, 0.14),
+      "paper-link": copper,
+      "on-accent": luma(copper) > 160 ? chassis : "#1a120c",
+      overlay: "rgba(0,0,0,0.82)",
+      "tick-rule": mixHex(copper, chassis, 0.55),
+      "error-text": "#f0a090",
+    };
+  }
+  function clearCustomProperties() {
+    CUSTOM_CSS_KEYS.forEach((k) => document.documentElement.style.removeProperty("--" + k));
+  }
+  function applyCustomColors(raw) {
+    const derived = deriveCustomTheme(raw);
+    const root = document.documentElement;
+    root.setAttribute("data-theme", "custom");
+    Object.entries(derived).forEach(([k, v]) => root.style.setProperty("--" + k, v));
+    document.querySelectorAll("#custom-colors [data-cvar]").forEach((input) => {
+      const c = Object.assign({}, DEFAULT_CUSTOM, raw || {});
+      if (c[input.dataset.cvar]) input.value = c[input.dataset.cvar];
+    });
+  }
+
+  function loadSettings() {
+    let stored = {};
+    try { stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") || {}; } catch (err) { stored = {}; }
+    if (stored.speedUp == null) {
+      try { stored.speedUp = localStorage.getItem("htb-speed-up") === "1"; } catch (err) { /* ignore */ }
+    }
+    const next = Object.assign({}, DEFAULT_SETTINGS, stored);
+    next.customColors = Object.assign({}, DEFAULT_CUSTOM, stored.customColors || {});
+    return next;
+  }
+
+  function saveSettings(partial) {
+    const cur = loadSettings();
+    const next = Object.assign({}, cur, partial);
+    if (partial && partial.customColors) {
+      next.customColors = Object.assign({}, cur.customColors, partial.customColors);
+    }
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(next)); } catch (err) { /* ignore */ }
+    return next;
+  }
+
+  function applyTheme(id, colors) {
+    const theme = THEMES.some((t) => t.id === id) ? id : "field";
+    const panel = $("custom-colors");
+    if (theme === "custom") {
+      applyCustomColors(colors || loadSettings().customColors);
+      if (panel) panel.classList.remove("hidden");
+    } else {
+      clearCustomProperties();
+      document.documentElement.setAttribute("data-theme", theme);
+      if (panel) panel.classList.add("hidden");
+    }
+    document.querySelectorAll(".theme-card").forEach((card) => {
+      card.classList.toggle("active", card.dataset.theme === theme);
+    });
+    return theme;
+  }
+
+  function applyNotesView(mode) {
+    const wrap = $("notes-split");
+    if (!wrap) return;
+    const allowed = ["split", "write", "nice"];
+    if (!allowed.includes(mode)) mode = "split";
+    wrap.classList.remove("mode-split", "mode-write", "mode-nice");
+    wrap.classList.add("mode-" + mode);
+    document.querySelectorAll("[data-notes-view]").forEach((b) => {
+      b.classList.toggle("active", b.getAttribute("data-notes-view") === mode);
+    });
+  }
+
+  function fillSettingsForm(s) {
+    if ($("set-start-tab")) $("set-start-tab").value = s.startTab;
+    if ($("set-notes-view")) $("set-notes-view").value = s.notesView;
+    if ($("set-category")) $("set-category").value = s.defaultCategory;
+    if ($("set-speed-up")) $("set-speed-up").checked = !!s.speedUp;
+    if ($("set-log-live")) $("set-log-live").checked = !!s.logLive;
+    if ($("set-tool-notes")) $("set-tool-notes").checked = !!s.includeToolNotes;
+    if ($("set-tool-cmd")) $("set-tool-cmd").checked = !!s.includeToolCmd;
+    if ($("set-tool-findings")) $("set-tool-findings").checked = !!s.includeToolFindings;
+    if ($("speed-up")) $("speed-up").checked = !!s.speedUp;
+    if ($("log-live")) $("log-live").checked = !!s.logLive;
+  }
+
+  function applySettings(s) {
+    applyTheme(s.theme, s.customColors);
+    applyNotesView(s.notesView);
+    fillSettingsForm(s);
+    state.category = CATS.includes(s.defaultCategory) ? s.defaultCategory : "NONE";
+  }
+
+  function renderThemeGrid() {
+    const grid = $("theme-grid");
+    if (!grid) return;
+    const current = loadSettings().theme;
+    grid.innerHTML = THEMES.map((t) => {
+      const sw = (THEME_SWATCH[t.id] || []).map((c) => `<i style="background:${c}"></i>`).join("");
+      return `<button type="button" class="theme-card${t.id === current ? " active" : ""}" data-theme="${t.id}">
+        <span class="theme-swatch">${sw}</span>
+        <span class="name">${escapeHtml(t.name)}</span>
+        <span class="blurb">${escapeHtml(t.blurb)}</span>
+      </button>`;
+    }).join("");
+  }
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({
@@ -81,7 +288,7 @@
         out.push("</div>");
         continue;
       }
-      const h = line.match(/^(#{1,4})\s+(.*)$/);
+      const h = line.match(/^\s*(#{1,6})\s*(.*)$/);
       if (h) {
         flushList();
         out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`);
@@ -121,6 +328,7 @@
     if (name === "evidence") refreshEvidence();
     if (name === "status") refreshStatus();
     if (name === "info") renderInfo();
+    if (name === "ctf") renderCtf();
     if (name === "tools" && !state.toolsLoaded) loadTools();
     if (name === "report" && !state.reportDirty) loadReport();
     if (name === "lab") {
@@ -242,7 +450,8 @@
     await refreshState();
     await loadNotes();
     await loadReport();
-    setTab("help");
+    const start = loadSettings().startTab;
+    setTab(TABS.includes(start) ? start : "help");
   }
 
   function speedUpOn() {
@@ -307,26 +516,26 @@
 
   let infoCache = null;
   let infoGroup = 0;
-  async function renderInfo(filter) {
-    if (!infoCache) infoCache = await api("/api/info");
-    const q = (filter || $("info-search").value || "").toLowerCase();
-    const target = infoCache.target || "$TARGET";
-    const nav = $("info-nav");
-    if (nav && !nav.dataset.ready) {
-      nav.innerHTML = infoCache.groups.map((g, i) => (
-        `<button type="button" data-info-g="${i}" class="${i === 0 ? "active" : ""}">${escapeHtml(g.group)}</button>`
-      )).join("");
-      nav.dataset.ready = "1";
-      nav.addEventListener("click", (e) => {
-        const btn = e.target.closest("[data-info-g]");
-        if (!btn) return;
-        infoGroup = Number(btn.dataset.infoG);
-        [...nav.children].forEach((b, i) => b.classList.toggle("active", i === infoGroup));
-        renderInfo();
-      });
-    }
-    const groups = infoCache.groups.filter((_, i) => i === infoGroup);
-    $("info-groups").innerHTML = groups.map((g) => {
+  let ctfGroup = 0;
+
+  function isCtfGroup(g) {
+    return /^CTF\b/i.test(String(g.group || ""));
+  }
+
+  function ctfNavLabel(name) {
+    return String(name || "").replace(/^CTF\s+/i, "");
+  }
+
+  function infoBuckets() {
+    const groups = (infoCache && infoCache.groups) || [];
+    return {
+      info: groups.filter((g) => !isCtfGroup(g)),
+      ctf: groups.filter(isCtfGroup),
+    };
+  }
+
+  function renderCheatCards(groups, q, target) {
+    return groups.map((g) => {
       const tools = g.tools.filter((t) => {
         const blob = `${t.name} ${t.bin} ${t.blurb} ${t.syntax} ${(t.options || []).join(" ")} ${(t.examples || []).join(" ")}`.toLowerCase();
         return !q || blob.includes(q);
@@ -345,6 +554,56 @@
       }).join("");
       return `<section class="info-group"><h2>${escapeHtml(g.group)}</h2>${cards}</section>`;
     }).join("");
+  }
+
+  async function ensureInfoCache() {
+    if (!infoCache) infoCache = await api("/api/info");
+    return infoCache;
+  }
+
+  function wireGroupNav(nav, stateKey, onChange) {
+    if (!nav || nav.dataset.ready) return;
+    nav.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-info-g]");
+      if (!btn) return;
+      if (stateKey === "ctf") ctfGroup = Number(btn.dataset.infoG);
+      else infoGroup = Number(btn.dataset.infoG);
+      [...nav.children].forEach((b, i) => b.classList.toggle("active", i === Number(btn.dataset.infoG)));
+      onChange();
+    });
+    nav.dataset.ready = "1";
+  }
+
+  async function renderInfo() {
+    const cache = await ensureInfoCache();
+    const groups = infoBuckets().info;
+    const q = ($("info-search").value || "").toLowerCase();
+    const target = cache.target || "$TARGET";
+    const nav = $("info-nav");
+    if (nav && !nav.dataset.ready) {
+      nav.innerHTML = groups.map((g, i) => (
+        `<button type="button" data-info-g="${i}" class="${i === 0 ? "active" : ""}">${escapeHtml(g.group)}</button>`
+      )).join("");
+      wireGroupNav(nav, "info", renderInfo);
+    }
+    const idx = Math.min(infoGroup, Math.max(0, groups.length - 1));
+    $("info-groups").innerHTML = renderCheatCards(groups.filter((_, i) => i === idx), q, target);
+  }
+
+  async function renderCtf() {
+    const cache = await ensureInfoCache();
+    const groups = infoBuckets().ctf;
+    const q = ($("ctf-search").value || "").toLowerCase();
+    const target = cache.target || "$TARGET";
+    const nav = $("ctf-nav");
+    if (nav && !nav.dataset.ready) {
+      nav.innerHTML = groups.map((g, i) => (
+        `<button type="button" data-info-g="${i}" class="${i === 0 ? "active" : ""}">${escapeHtml(ctfNavLabel(g.group))}</button>`
+      )).join("");
+      wireGroupNav(nav, "ctf", renderCtf);
+    }
+    const idx = Math.min(ctfGroup, Math.max(0, groups.length - 1));
+    $("ctf-groups").innerHTML = renderCheatCards(groups.filter((_, i) => i === idx), q, target);
   }
 
   async function loadTools() {
@@ -411,7 +670,10 @@
     $("tool-cmd-preview").textContent = "";
     $("tool-copy").value = "";
     $("tool-extra").value = "";
-    if ($("tool-notes")) $("tool-notes").checked = false;
+    const prefs = loadSettings();
+    if ($("tool-notes")) $("tool-notes").checked = !!prefs.includeToolNotes;
+    if ($("tool-notes-cmd")) $("tool-notes-cmd").checked = prefs.includeToolCmd !== false;
+    if ($("tool-notes-findings")) $("tool-notes-findings").checked = prefs.includeToolFindings !== false;
     syncNotesOptions();
     if (found.kind === "custom") {
       $("tool-cmd").value = "";
@@ -779,11 +1041,9 @@
     document.querySelectorAll("[data-notes-view]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const mode = btn.getAttribute("data-notes-view");
-        $("notes-split").classList.remove("mode-split", "mode-write", "mode-nice");
-        $("notes-split").classList.add("mode-" + mode);
-        document.querySelectorAll("[data-notes-view]").forEach((b) => {
-          b.classList.toggle("active", b === btn);
-        });
+        applyNotesView(mode);
+        saveSettings({ notesView: mode });
+        if ($("set-notes-view")) $("set-notes-view").value = mode;
       });
     });
     CATS.forEach((cat) => {
@@ -797,6 +1057,11 @@
       });
       $("note-cats").appendChild(chip);
     });
+    if ($("set-category")) {
+      $("set-category").innerHTML = CATS.map((cat) =>
+        `<option value="${cat}">${cat === "NONE" ? "None" : cat}</option>`
+      ).join("");
+    }
     $("btn-stamp").addEventListener("click", async () => {
       const data = await api("/api/notes/stamp", {
         method: "POST",
@@ -1021,6 +1286,7 @@
     $("tool-form").addEventListener("input", onToolFieldsChanged);
     $("tool-form").addEventListener("change", onToolFieldsChanged);
     $("info-search").addEventListener("input", () => renderInfo());
+    $("ctf-search").addEventListener("input", () => renderCtf());
     $("source-na").addEventListener("change", () => {
       $("evidence-source").disabled = $("source-na").checked;
       if ($("source-na").checked) $("evidence-source").value = "";
@@ -1287,15 +1553,61 @@
         refreshLogs(true).catch(() => {});
       }
     });
-    try {
-      $("speed-up").checked = localStorage.getItem("htb-speed-up") === "1";
-    } catch (err) { /* ignore */ }
     $("speed-up").addEventListener("change", () => {
-      try {
-        localStorage.setItem("htb-speed-up", $("speed-up").checked ? "1" : "0");
-      } catch (err) { /* ignore */ }
-      if (!$("speed-up").checked) refreshState().catch(() => {});
+      const on = !!$("speed-up").checked;
+      saveSettings({ speedUp: on });
+      if ($("set-speed-up")) $("set-speed-up").checked = on;
+      try { localStorage.setItem("htb-speed-up", on ? "1" : "0"); } catch (err) { /* ignore */ }
+      if (!on) refreshState().catch(() => {});
     });
+    renderThemeGrid();
+    $("theme-grid").addEventListener("click", (e) => {
+      const card = e.target.closest("[data-theme]");
+      if (!card) return;
+      const s = saveSettings({ theme: card.dataset.theme });
+      applyTheme(s.theme, s.customColors);
+    });
+    $("custom-colors").addEventListener("input", (e) => {
+      const input = e.target.closest("[data-cvar]");
+      if (!input) return;
+      const s = saveSettings({ theme: "custom", customColors: { [input.dataset.cvar]: input.value } });
+      applyTheme("custom", s.customColors);
+    });
+    $("btn-custom-reset").addEventListener("click", () => {
+      const s = saveSettings({ theme: "custom", customColors: DEFAULT_CUSTOM });
+      applyTheme("custom", s.customColors);
+    });
+    [
+      ["set-start-tab", "startTab", false],
+      ["set-notes-view", "notesView", false],
+      ["set-category", "defaultCategory", false],
+      ["set-speed-up", "speedUp", true],
+      ["set-log-live", "logLive", true],
+      ["set-tool-notes", "includeToolNotes", true],
+      ["set-tool-cmd", "includeToolCmd", true],
+      ["set-tool-findings", "includeToolFindings", true],
+    ].forEach(([id, key, isCheck]) => {
+      const el = $(id);
+      if (!el) return;
+      el.addEventListener("change", () => {
+        const value = isCheck ? !!el.checked : el.value;
+        saveSettings({ [key]: value });
+        if (key === "notesView") applyNotesView(value);
+        if (key === "speedUp") {
+          if ($("speed-up")) $("speed-up").checked = value;
+          try { localStorage.setItem("htb-speed-up", value ? "1" : "0"); } catch (err) { /* ignore */ }
+        }
+        if (key === "logLive" && $("log-live")) $("log-live").checked = value;
+        if (key === "defaultCategory" && CATS.includes(value)) {
+          state.category = value;
+          document.querySelectorAll("#note-cats .chip").forEach((c, i) => {
+            c.classList.toggle("active", CATS[i] === value);
+          });
+        }
+        if (key === "theme") applyTheme(value);
+      });
+    });
+    applySettings(loadSettings());
     setInterval(() => {
       if (!speedUpOn()) refreshState().catch(() => {});
       if ($("tab-logs").classList.contains("active") && $("log-live").checked) {

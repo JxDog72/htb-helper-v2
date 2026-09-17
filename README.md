@@ -103,7 +103,9 @@ GUI sections:
 | Notes | Full `.md` editor + live preview. `# Machine` title, `### Lab instructions`, `### Workflow`. Stamp `[HH:MM]` (category optional). |
 | Logs | Optional live tail of `session.log`. **New terminal** opens another captured shell as `terminal2_session.log`. Header **Speed up** skips 2.5s polling. |
 | Tools | Categories with sub-tools (including XSS/SQLi). Nmap presets include `-Pn`. Wordlist tools use a dropdown of installed lists. **Send to terminal** types the command into the logged shell. **Run and capture** also appends to `session.log`. Optional notes stamp can include the full command and/or a findings summary. Custom: one Command box. |
-| Tool Info | Cheat sheet with category tabs, nmap flags (`-Pn` explained), XSS/SQL injection, CyberChef, official CVE links, ICS/Modbus |
+| Tool Info | Cheat sheet with category tabs, nmap flags (`-Pn` explained), XSS/SQL injection, ICS/Modbus |
+| CTF | Event cheat sheets (crypto, cracking, logs, enum, scanning, traffic, web, OSINT, forensics, reverse/pwn, stego, privilege escalation) — left rail, under Status |
+| Settings | Browser-local theme (six schemes + custom colors) and GUI defaults. Not in the lab ZIP. |
 | Evidence / Files / Report / Status | Evidence without hashes. Status: ZIP then SCP, or encrypted 7z then [wormhole.app](https://wormhole.app). |
 
 Notes auto-save. `Ctrl+S` save, `Ctrl+N` stamp, `Ctrl+1`–`8` tabs,

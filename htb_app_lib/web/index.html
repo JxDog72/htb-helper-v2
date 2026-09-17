@@ -4,7 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=21" />
+  <link rel="stylesheet" href="/app.css?v=25" />
+  <script>
+    try {
+      var s = JSON.parse(localStorage.getItem("htb-settings") || "{}");
+      if (s.theme) document.documentElement.setAttribute("data-theme", s.theme);
+    } catch (e) {}
+  </script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect fill='%23161410' width='16' height='16'/><circle cx='8' cy='8' r='4' fill='%23c9843a'/></svg>" />
 </head>
 <body>
@@ -80,8 +86,10 @@
       <button data-tab="report" class="rail-btn">Report</button>
       <button data-tab="convert" class="rail-btn">Convert</button>
       <button data-tab="status" class="rail-btn">Status</button>
+      <button data-tab="ctf" class="rail-btn">CTF</button>
       <button data-tab="help" class="rail-btn">Help</button>
       <button data-tab="lab" class="rail-btn">Lab-Config</button>
+      <button data-tab="settings" class="rail-btn">Settings</button>
     </nav>
 
     <main>
@@ -187,7 +195,7 @@
       <section id="tab-info" class="tab">
         <div class="row wrap">
           <input id="info-search" type="search" placeholder="Filter tools (nmap, sqlmap, xss…)" />
-          <span class="quiet">Cheat sheet only — running a tool is on the Tools tab. Syntax uses the configured target as $TARGET. XSS / SQL injection is its own category.</span>
+          <span class="quiet">Cheat sheet only — running a tool is on the Tools tab. Syntax uses the configured target as $TARGET. XSS / SQL injection is its own category. CTF event notes are on the <strong>CTF</strong> rail tab (below Status).</span>
         </div>
         <nav class="tool-nav" id="info-nav" aria-label="Tool info categories"></nav>
         <div id="info-groups" class="info-groups"></div>
@@ -235,7 +243,7 @@
           <span class="quiet">New labs start with this template. Recording evidence also appends the E-ID here. Paste images with Ctrl+V.</span>
         </div>
         <div class="notes-split report-split mode-both" id="report-split">
-          <textarea id="report-editor" spellcheck="true" aria-label="report_draft.md" placeholder="# HTB Challenge:&#10;&#10;## Executive Summary&#10;"></textarea>
+          <textarea id="report-editor" spellcheck="true" aria-label="report_draft.md" placeholder="# HTB Challenge:&#10;&#10;## Executive Summary&#10;A short, non-technical overview of what was tested and found&#10;&#10;## Scope&#10;The target machine, IP address, and dates of testing&#10;&#10;## Methodology&#10;The general approach you followed, phase by phase&#10;&#10;## Findings&#10;Each vulnerability found, with description, evidence, severity, and how it was confirmed&#10;&#10;## Attack Narrative&#10;A step by step account of how you moved from initial access to the final flag&#10;&#10;## Remediation&#10;Practical recommendations to fix each finding&#10;&#10;## Conclusion&#10;A brief closing summary"></textarea>
           <article id="report-view" class="paper" aria-label="Report preview"></article>
         </div>
       </section>
@@ -243,7 +251,7 @@
       <section id="tab-convert" class="tab">
         <div class="stack narrow">
           <h2>Flag converter</h2>
-          <p class="lede">HTB flags are often <code>HTB{...}</code>. If you only have ASCII codes, H is <code>72</code>, T is <code>84</code>, B is <code>66</code>, <code>{</code> is <code>123</code>. Convert here, or use CyberChef (linked in Tool Info).</p>
+          <p class="lede">HTB flags are often <code>HTB{...}</code>. If you only have ASCII codes, H is <code>72</code>, T is <code>84</code>, B is <code>66</code>, <code>{</code> is <code>123</code>. Convert here, or use CyberChef (linked on the CTF tab).</p>
           <label>ASCII decimals (spaces, commas, or a list)
             <textarea id="conv-decimal" rows="4" placeholder="72 84 66 123   or   72, 84, 66, 123   or   [72, 84, 66, 123]"></textarea>
           </label>
@@ -329,6 +337,15 @@
         </div>
       </section>
 
+      <section id="tab-ctf" class="tab">
+        <div class="row wrap">
+          <input id="ctf-search" type="search" placeholder="Filter CTF notes (jwt, volatility, zsteg, xor…)" />
+          <span class="quiet">CTF cheat sheet. Running a tool is still on the Tools tab. $TARGET is the configured lab IP.</span>
+        </div>
+        <nav class="tool-nav" id="ctf-nav" aria-label="CTF categories"></nav>
+        <div id="ctf-groups" class="info-groups"></div>
+      </section>
+
       <section id="tab-help" class="tab">
         <article class="help-page">
           <h2>Help</h2>
@@ -405,6 +422,9 @@ git pull
           <h3>XSS / SQL injection</h3>
           <p>Tools tab category <strong>6. XSS / SQL injection</strong> has sqlmap, ffuf wordlist fuzz, curl probes, and dalfox. Tool Info has the cheat sheet (error/boolean/UNION/time-based SQLi, reflected/stored/DOM XSS). Check <strong>Include tool use in notes.md</strong> then pick whether to stamp the full command and/or the parser summary.</p>
 
+          <h3>CTF tab</h3>
+          <p>Left rail, under Status. Event-style cheat sheets (crypto, cracking, logs, enum, scanning, traffic, web, OSINT, forensics, reverse/pwn, stego, privilege escalation). Tool Info stays the HTB lab tool reference (nmap, gobuster, ICS, …).</p>
+
           <h3>E-ID</h3>
           <p><strong>E-001</strong> is just the next evidence number so you can cite it in the report (like a footnote ID).</p>
 
@@ -450,8 +470,63 @@ git pull
         </form>
         <p class="quiet">To switch machines or start a new lab, use <strong>Switch lab</strong> in the header (same as <code>./htb --cli</code> option 14). If rename fails because the logged shell is sitting in that folder, type <code>exit</code>, Ctrl+C, start <code>./htb</code> again, then save.</p>
       </section>
+
+      <section id="tab-settings" class="tab">
+        <div class="settings-grid">
+          <div class="settings-block">
+            <h2>Theme</h2>
+            <p class="lede">Built-in schemes plus your own colors. Saved in this browser only — not in the lab folder, notes, or ZIP/7z export.</p>
+            <div class="theme-grid" id="theme-grid"></div>
+            <div id="custom-colors" class="custom-colors hidden">
+              <h3>Custom colors</h3>
+              <p class="lede">Pick the main colors. The rest of the UI is derived from these. Changes save as you pick.</p>
+              <div class="color-rows">
+                <label>Page background <input type="color" data-cvar="chassis" /></label>
+                <label>UI text <input type="color" data-cvar="text" /></label>
+                <label>Accent <input type="color" data-cvar="copper" /></label>
+                <label>Accent highlight <input type="color" data-cvar="copperHot" /></label>
+                <label>Notes paper <input type="color" data-cvar="paper" /></label>
+                <label>Paper ink <input type="color" data-cvar="ink" /></label>
+                <label>Console <input type="color" data-cvar="console" /></label>
+              </div>
+              <button type="button" class="btn ghost" id="btn-custom-reset">Reset custom to Field notebook</button>
+            </div>
+          </div>
+          <div class="settings-block">
+            <h2>Defaults</h2>
+            <p class="lede">How the GUI starts after you pick a lab. Same as theme: this browser only, never in the ZIP.</p>
+            <label class="set-select">Open this tab after choosing a lab
+              <select id="set-start-tab">
+                <option value="help">Help</option>
+                <option value="notes">Notes</option>
+                <option value="tools">Tools</option>
+                <option value="ctf">CTF</option>
+                <option value="report">Report</option>
+                <option value="status">Status</option>
+              </select>
+            </label>
+            <label class="set-select">Notes view
+              <select id="set-notes-view">
+                <option value="split">Split</option>
+                <option value="write">Write</option>
+                <option value="nice">Nice view</option>
+              </select>
+            </label>
+            <label class="set-select">Default note category
+              <select id="set-category"></select>
+            </label>
+            <div class="settings-checks">
+              <label class="check"><input type="checkbox" id="set-speed-up" /> Speed up (less polling)</label>
+              <label class="check"><input type="checkbox" id="set-log-live" /> Logs live view on</label>
+              <label class="check"><input type="checkbox" id="set-tool-notes" /> Include tool use in notes.md by default</label>
+              <label class="check"><input type="checkbox" id="set-tool-cmd" /> Include full command in that stamp</label>
+              <label class="check"><input type="checkbox" id="set-tool-findings" /> Include findings summary in that stamp</label>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
-  <script src="/app.js?v=35"></script>
+  <script src="/app.js?v=40"></script>
 </body>
 </html>
