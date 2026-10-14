@@ -86,7 +86,7 @@ files_given/       files the lab handed you
 machine_json/      app-only (not in the ZIP)
 ```
 
-The parent folder is still `student_machine`. ZIP/7z export is written **next to** `machines/` (not inside the lab folder) and contains `student_machine_logs/`, `_screenshots/`, `_notes/` (notes.md + evidence.md), `_report/`, `_files_given/`. `machine_json/` is omitted.
+The parent folder is still `student_machine`. ZIP/7z export is written beside the lab folder (not inside it) and opens as two folders: `student_machine/` (work: `student_machine_logs/`, `_screenshots/`, `_notes/` with notes.md + evidence.md, `_files_given/`) and `student_machine_report/` beside it. `machine_json/` is omitted.
 
 **Rename a machine:** the GUI label comes from
 `machines/<folder>/machine_json/metadata.json` (`machine_name`), not from

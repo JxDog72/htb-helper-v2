@@ -30,6 +30,7 @@ This tool is intended only for systems the student is authorized to test.
 from pathlib import Path
 from datetime import datetime
 import argparse
+import ctypes
 import hashlib
 import ipaddress
 import json
@@ -64,6 +65,59 @@ SCREENSHOT_MILESTONES = {
 # ============================================================
 # GENERAL UTILITIES
 # ============================================================
+
+def _stdout_color():
+    """True when stdout is a terminal that can show red/yellow ANSI text."""
+    if os.environ.get("NO_COLOR"):
+        return False
+    try:
+        if not sys.stdout.isatty():
+            return False
+    except Exception:
+        return False
+    if os.name != "nt":
+        return True
+    try:
+        # Private WinDLL so this does not change kernel32 prototypes used elsewhere.
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        get_handle = kernel.GetStdHandle
+        get_handle.restype = ctypes.c_void_p
+        get_handle.argtypes = [ctypes.c_ulong]
+        get_mode = kernel.GetConsoleMode
+        get_mode.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint32)]
+        get_mode.restype = ctypes.c_int
+        set_mode = kernel.SetConsoleMode
+        set_mode.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        set_mode.restype = ctypes.c_int
+        handle = get_handle(ctypes.c_ulong(0xFFFFFFF5).value)  # STD_OUTPUT_HANDLE
+        if not handle:
+            return False
+        mode = ctypes.c_uint32()
+        if not get_mode(handle, ctypes.byref(mode)):
+            return False
+        enable_vt = 0x0004  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        if mode.value & enable_vt:
+            return True
+        return bool(set_mode(handle, mode.value | enable_vt))
+    except (AttributeError, OSError):
+        return False
+
+
+def print_keep_terminal_warning():
+    """Red on yellow, then yellow. Shown when the helper terminal starts."""
+    headline = " DO NOT CLOSE THIS TERMINAL UNTIL YOU ARE DONE. "
+    detail = " Closing it stops the helper. Leave this window open while you work. "
+    print()
+    if _stdout_color():
+        print(f"\033[1;31;43m{headline}\033[0m")
+        print(f"\033[1;33m{detail}\033[0m")
+    else:
+        print("*" * len(headline))
+        print(headline)
+        print(detail)
+        print("*" * len(headline))
+    print()
+
 
 def timestamp():
     return datetime.now().strftime("%H:%M")
@@ -2722,8 +2776,24 @@ def seven_zip_bin():
     return shutil.which("7z") or shutil.which("7za") or shutil.which("7z.exe")
 
 
+def _copy_into(src, dest):
+    dest.mkdir(parents=True, exist_ok=True)
+    if not src.is_dir():
+        return
+    for item in src.iterdir():
+        target = dest / item.name
+        if item.is_dir():
+            shutil.copytree(item, target, dirs_exist_ok=True)
+        else:
+            shutil.copy2(item, target)
+
+
 def stage_export_tree(workspace):
-    """Stage report folders as student_machine_logs, _notes, etc. No machine_json."""
+    """Stage two archive roots. No machine_json.
+
+    <slug>/                 work: logs, screenshots, notes, files_given
+    <slug>_report/          report, sibling of the work folder
+    """
     workspace = Path(workspace).resolve()
     slug = workspace.name
     root = Path(tempfile.mkdtemp(prefix="htb-export-"))
@@ -2733,21 +2803,11 @@ def stage_export_tree(workspace):
         "logs": f"{slug}_logs",
         "screenshots": f"{slug}_screenshots",
         "notes": f"{slug}_notes",
-        "report": f"{slug}_report",
         "files_given": f"{slug}_files_given",
     }
     copied = []
     for src_name, dest_name in mapping.items():
-        src = workspace / src_name
-        dest = staged / dest_name
-        dest.mkdir(parents=True, exist_ok=True)
-        if src.is_dir():
-            for item in src.iterdir():
-                target = dest / item.name
-                if item.is_dir():
-                    shutil.copytree(item, target, dirs_exist_ok=True)
-                else:
-                    shutil.copy2(item, target)
+        _copy_into(workspace / src_name, staged / dest_name)
         copied.append(dest_name)
     notes_dest = staged / f"{slug}_notes"
     notes_dest.mkdir(parents=True, exist_ok=True)
@@ -2758,6 +2818,9 @@ def stage_export_tree(workspace):
         src = workspace / stray
         if src.is_file() and not (notes_dest / stray).exists():
             shutil.copy2(src, notes_dest / stray)
+    report_name = f"{slug}_report"
+    _copy_into(workspace / "report", root / report_name)
+    copied.append(report_name)
     return root, staged, copied
 
 
@@ -2781,7 +2844,7 @@ def create_export_archive(workspace, *, encrypt=False, password=""):
             archive = dest_dir / f"{slug}_{stamp}.7z"
             cmd = [
                 binary, "a", "-t7z", "-mhe=on", f"-p{password}",
-                str(archive), slug,
+                str(archive), slug, f"{slug}_report",
             ]
             result = subprocess.run(
                 cmd, cwd=str(root), check=False,
@@ -2791,8 +2854,9 @@ def create_export_archive(workspace, *, encrypt=False, password=""):
                 raise RuntimeError(result.stdout.strip() or "7z failed.")
             return str(archive), copied, "7z"
         archive_base = dest_dir / f"{slug}_{stamp}"
+        # root holds both top folders: <slug>/ and <slug>_report/.
         archive = shutil.make_archive(
-            str(archive_base), "zip", root_dir=str(root), base_dir=slug,
+            str(archive_base), "zip", root_dir=str(root),
         )
         return str(Path(archive).resolve()), copied, "zip"
     finally:
@@ -2882,7 +2946,9 @@ def create_zip(workspace):
     print("=" * 60)
     try:
         archive, copied, kind = create_export_archive(workspace)
+        slug = Path(workspace).name
         print(f"\n[+] Archive created ({kind}):\n    {archive}")
+        print(f"[+] Two top folders: {slug}/ (work) and {slug}_report/.")
         print(f"[+] Included: {', '.join(copied) or '(empty)'}")
         print("[+] machine_json/ was left out (app-only).")
     except Exception as exc:
@@ -3385,6 +3451,7 @@ def main():
         return
 
     try:
+        print_keep_terminal_warning()
         interactive_mode(
             config,
             workspace,

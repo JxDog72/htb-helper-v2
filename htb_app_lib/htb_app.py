@@ -2123,9 +2123,11 @@ def start_logged_shell(log_file: Path):
         flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0x00000010)
         subprocess.Popen(inner, cwd=str(STATE["workspace"]), creationflags=flags)
         print("[+] Logged shell opened in a NEW window titled like python.exe — type THERE.")
-        print("[+] That window is session.log. This window is GUI-only (Ctrl+C stops the helper).\n")
+        print("[+] That window is session.log. This window is GUI-only (Ctrl+C stops the helper).")
+        engine.print_keep_terminal_warning()
         return
-    print("[+] Work in THIS terminal. Notes / tools GUI is the browser.\n")
+    print("[+] Work in THIS terminal. Notes / tools GUI is the browser.")
+    engine.print_keep_terminal_warning()
     run_logged_shell(log_file)
     STATE["session_active"] = False
     if engine.verify_session_log(log_file):
@@ -2161,6 +2163,7 @@ def print_banner(url: str):
     print("=" * 60)
     print(f" HTB Helper {APP_VERSION}  —  local field notebook")
     print("=" * 60)
+    engine.print_keep_terminal_warning()
     print(f" GUI:      {url}")
     print(" Bind:     127.0.0.1 only (this machine)")
     if STATE["workspace"]:
@@ -2250,6 +2253,7 @@ def main():
         print(f"[*] GUI only. Open {url}")
         print("[*] This terminal stays with the GUI. Ctrl+C to stop.")
         print("[*] For a logged work shell, run ./htb  (without --gui-only).")
+        engine.print_keep_terminal_warning()
         try:
             while True:
                 time.sleep(1)
@@ -2264,6 +2268,7 @@ def main():
     else:
         print("[*] This terminal becomes the logged shell after you choose.")
         print("[*] Do not Ctrl+C unless you want to quit the helper.")
+    engine.print_keep_terminal_warning()
     try:
         while not STATE["session_ready"].wait(timeout=0.5):
             pass
