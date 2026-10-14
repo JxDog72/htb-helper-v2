@@ -142,3 +142,21 @@ python3 htb_app_lib/htb_helper.py --stats
 In `./htb --cli`, option **14** views/changes the machine name or starts a new lab.
 
 In the GUI, **Lab-Config** (bottom of the left rail) changes this lab's student ID, machine name, target IP, and assigned port. A new student ID or machine name moves `machines/student_machine/` and matching zip/7z exports (including the `student_machine_logs` folders inside a zip).
+
+## 7. Stop the helper
+
+Start with `./htb` in a terminal. Type `exit` in the logged shell, then Ctrl+C in that same window.
+
+Clicking the `htb` file in the file manager starts the page with no terminal, so `http://127.0.0.1:8765/` stays up. From any terminal:
+
+```bash
+pkill -f htb_app.py
+```
+
+Refresh the browser. If the page does not load, it is stopped. The helper may use ports 8765–8784. If the address bar shows a different port:
+
+```bash
+fuser -k 8765/tcp
+```
+
+On Windows, Ctrl+C in the `htb.cmd` window, or close that window.

@@ -218,3 +218,27 @@ attacks, or out-of-scope scanning are your responsibility.
 Data-collection aid only. It does not exploit anything or decide what
 to attack. Authorized HTB Enterprise targets only. Follow the research
 team’s instructions. Keep failed attempts — they are study data.
+
+---
+
+## If localhost:8765 will not stop
+
+Start with `./htb` in a terminal. Type `exit` in the logged shell, then
+Ctrl+C in that same window.
+
+Clicking the `htb` file in a file manager can start the page with no
+terminal. `http://127.0.0.1:8765/` stays up until you stop the process.
+On Linux, from any terminal:
+
+```bash
+pkill -f htb_app.py
+```
+
+Refresh the browser. If the page does not load, it is stopped. The helper
+may use ports 8765–8784. If the address bar shows a different port:
+
+```bash
+fuser -k 8765/tcp
+```
+
+On Windows, Ctrl+C in the `htb.cmd` window, or close that window.

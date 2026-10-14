@@ -355,6 +355,11 @@
             <li>In the <strong>logged terminal</strong> type <code>exit</code> (ends <code>session.log</code>).</li>
             <li>Then <kbd>Ctrl</kbd>+<kbd>C</kbd> in that same terminal to stop the GUI.</li>
           </ol>
+          <p>Start from a terminal with <code>./htb</code> or <code>.\htb.cmd</code>. That window is how you stop it. On Windows, <kbd>Ctrl</kbd>+<kbd>C</kbd> in the <code>htb.cmd</code> window (or closing that window) stops the page.</p>
+          <p>If you clicked the <code>htb</code> file in the file manager, there is no window for <kbd>Ctrl</kbd>+<kbd>C</kbd> and <code>http://127.0.0.1:8765/</code> stays up. On Linux, open any terminal and run:</p>
+          <pre class="syntax">pkill -f htb_app.py</pre>
+          <p>Refresh the browser. If the page does not load, the helper is stopped. The port can be 8765–8784. If the address bar shows a different port, stop that one:</p>
+          <pre class="syntax">fuser -k 8765/tcp</pre>
           <p><kbd>Ctrl</kbd>+<kbd>C</kbd> during a scan (ping, nmap, tracert) should stop <em>that command</em>, not the helper. On Windows, <kbd>Ctrl</kbd>+<kbd>C</kbd> twice quickly exits the logged shell if it is stuck. If the GUI dies too, just start <code>./htb</code> / <code>.\htb.cmd</code> again.</p>
 
           <h3>First install (Parrot / Kali)</h3>
