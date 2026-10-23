@@ -158,6 +158,18 @@
       "description": "Infrastructure change-request portal with an admin approval workflow"
     },
     {
+      "name": "Clearance",
+      "aliases": [],
+      "type": "Challenge",
+      "category": "Offensive",
+      "difficulty": "Easy",
+      "field": "General",
+      "status": "approved",
+      "posted": "",
+      "notes": "",
+      "description": ""
+    },
+    {
       "name": "BlueTide Marine",
       "aliases": ["BlueTide"],
       "type": "Challenge",
@@ -300,6 +312,18 @@
       "posted": "",
       "notes": "",
       "description": "Windows satellite ground segment command-signing investigation"
+    },
+    {
+      "name": "Arcadia'sCompromise",
+      "aliases": [],
+      "type": "Sherlock",
+      "category": "Defensive",
+      "difficulty": "Hard",
+      "field": "General",
+      "status": "approved",
+      "posted": "",
+      "notes": "",
+      "description": ""
     },
     {
       "name": "MIATwo",

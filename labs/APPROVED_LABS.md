@@ -1,13 +1,13 @@
 # Approved labs
 
-Last checked: 2026-10-22.
+Last checked: 2026-10-23.
 
 Generated from `labs/approved_labs.json`. Edit the JSON, then run `python labs/render_approved_labs.py`.
 Do not put writeup URLs in either file.
 
 The helper ZIP opens as two folders: `studentID_machinename/` (logs, screenshots, notes, files_given) and `studentID_machinename_report/` beside it.
 
-## Approved (26)
+## Approved (28)
 
 | name | type | category | difficulty | field | description |
 | --- | --- | --- | --- | --- | --- |
@@ -24,6 +24,7 @@ The helper ZIP opens as two folders: `studentID_machinename/` (logs, screenshots
 | Monitor | Machine | Offensive | Easy | General | Linux machine with a WordPress install and several plugins |
 | Click | Machine | Offensive | Easy | General | Simulated Windows 10 user workstation with remote-control and Docker apps |
 | Statebound | Challenge | Offensive | Easy | General | Infrastructure change-request portal with an admin approval workflow |
+| Clearance | Challenge | Offensive | Easy | General |  |
 | BlueTide Marine | Challenge | Offensive | Easy | ICS | Red-team an offshore fuel logistics firm's maritime operational stack |
 | TemplTrap | Machine | Offensive | Easy | AI | Linux server running an AI agent and MCP builder |
 | Trustful | Machine | Offensive | Easy | AI | Linux AI machine with vLLM, MinIO, and CI/CD |
@@ -36,6 +37,7 @@ The helper ZIP opens as two folders: `studentID_machinename/` (logs, screenshots
 | KeyDis | Sherlock | Defensive | Medium | General | Statically reverse engineer a Windows executable to rebuild its attack chain. |
 | Facet | Machine | Offensive | Hard | AI | Linux machine with an AI face verification system used for authentication |
 | Uplink | Machine | Offensive | Hard | ICS | Windows satellite ground segment command-signing investigation |
+| Arcadia'sCompromise | Sherlock | Defensive | Hard | General |  |
 | MIATwo | Machine | Offensive | Insane | AI | Membership inference attack on a black-box latent diffusion model |
 
 ## Pending (1)
