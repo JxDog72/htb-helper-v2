@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=25" />
+  <link rel="stylesheet" href="/app.css?v=26" />
   <script>
     try {
       var s = JSON.parse(localStorage.getItem("htb-settings") || "{}");
@@ -90,6 +90,7 @@
       <button data-tab="help" class="rail-btn">Help</button>
       <button data-tab="lab" class="rail-btn">Lab-Config</button>
       <button data-tab="settings" class="rail-btn">Settings</button>
+      <button data-tab="checklab" class="rail-btn rail-check">Check Lab</button>
     </nav>
 
     <main>
@@ -278,15 +279,6 @@
             <p id="release-detail" class="quiet"></p>
             <ul id="preflight-list" class="ticks"></ul>
             <button type="button" class="btn ghost" id="btn-bootstrap">Install missing helper packages</button>
-            <h2>Check lab</h2>
-            <p class="lede">Looks up the study list. A missing list does not delete your folder, and you can still go on.</p>
-            <label>Lab name
-              <input id="lab-check-name" list="lab-check-names" placeholder="Llama" autocomplete="off" />
-            </label>
-            <datalist id="lab-check-names"></datalist>
-            <button type="button" class="btn ghost" id="btn-lab-check">Check lab</button>
-            <p id="lab-check-out" class="quiet"></p>
-            <label class="check"><input type="checkbox" id="block-unapproved" /> Refuse to create a new lab folder when the list says it is not approved</label>
           </div>
           <div>
             <h2>Statistics</h2>
@@ -376,7 +368,7 @@
           <h3>Version and lab list</h3>
           <p>Students stay on <code>main</code>. When a newer release exists, the terminal and Status tell you, and give a <code>git pull --ff-only</code> command. <code>./htb --no-update-check</code> skips that lookup.</p>
           <p>A <code>dev</code> checkout says <code>Dev build</code> and the latest student release. It does not ask you to update over your test copy.</p>
-          <p>Status → <strong>Check lab</strong> reads the public approved list. Approved labs are clear as of the list date. Anything else: contact Tristan before you start. If the list cannot be downloaded: contact Tristan or Jalen as soon as you can, and wait to hear back. You can still go on. The helper does not delete the folder.</p>
+          <p><strong>Check Lab</strong> (green, under Settings) reads the approved list. Green means approved. Red means not approved. Orange means check with the Team lead. If the list cannot be downloaded, you can still go on. The helper does not delete the folder.</p>
 
           <h3>First install (Parrot / Kali)</h3>
           <pre class="syntax">git clone https://github.com/JxDog72/htb-helper-v2.git
@@ -546,8 +538,23 @@ git pull
           </div>
         </div>
       </section>
+
+      <section id="tab-checklab" class="tab">
+        <h2>Check lab</h2>
+        <p class="lede">Green is approved. Red is not approved. Orange means check with the Team lead. Your lab folder is not deleted.</p>
+        <p id="lab-check-headline" class="lab-verdict unsure">CHECK WITH THE TEAM LEAD</p>
+        <p id="lab-check-detail" class="lede"></p>
+        <label>Lab name
+          <input id="lab-check-name" placeholder="Llama" autocomplete="off" />
+        </label>
+        <button type="button" class="btn ghost" id="btn-lab-check">Check lab</button>
+        <label class="check"><input type="checkbox" id="block-unapproved" /> Refuse to create a new lab folder when the list says it is not approved</label>
+        <h3>Approved labs</h3>
+        <p class="quiet">Click a name to check it. To start that lab, use Switch lab and enter the name.</p>
+        <div id="approved-lab-list" class="approved-lab-list"></div>
+      </section>
     </main>
   </div>
-  <script src="/app.js?v=42"></script>
+  <script src="/app.js?v=43"></script>
 </body>
 </html>

@@ -345,14 +345,16 @@ def check_lab(name):
     """Match a lab name. Unreachable lists do not block work."""
     query = str(name or "").strip()
     unreachable = (
-        "Couldn't reach the approved lab list. Contact Tristan or Jalen ASAP. "
-        "Do not continue until you hear back. You can still go on."
+        "Couldn't reach the approved lab list. Check with the Team lead. "
+        "You can still go on."
     )
-    unknown = "Not on the approved list yet. Contact Tristan before starting this lab."
+    unknown = "Not sure this lab is approved. Check with the Team lead before you start."
     result = {
         "ok": False,
         "query": query,
         "status": "",
+        "tone": "unsure",
+        "headline": "CHECK WITH THE TEAM LEAD",
         "reachable": False,
         "message": unreachable if query else unknown,
         "last_checked": "",
@@ -365,6 +367,7 @@ def check_lab(name):
     data, source = load_lab_list()
     if not data:
         result["message"] = unreachable
+        result["headline"] = f"{query} — CHECK WITH THE TEAM LEAD"
         return result
     result["reachable"] = True
     result["source"] = source
@@ -384,6 +387,8 @@ def check_lab(name):
     if match is None:
         result["ok"] = True
         result["status"] = "unknown"
+        result["tone"] = "unsure"
+        result["headline"] = f"{query} — CHECK WITH THE TEAM LEAD"
         result["message"] = unknown
         return result
     status = str(match.get("status") or "").strip().lower()
@@ -406,10 +411,19 @@ def check_lab(name):
         status = "pending"
     if source == "dev-copy":
         message += " Lab list is the copy in this dev folder. Students read the list from main."
+    label = str(match.get("name") or query)
+    if status == "approved":
+        tone, headline = "approved", f"{label} — APPROVED"
+    elif status == "rejected":
+        tone, headline = "rejected", f"{label} — NOT APPROVED"
+    else:
+        tone, headline = "unsure", f"{label} — CHECK WITH THE TEAM LEAD"
     result["ok"] = True
     result["status"] = status
+    result["tone"] = tone
+    result["headline"] = headline
     result["message"] = message
-    result["name"] = str(match.get("name") or query)
+    result["name"] = label
     return result
 
 
@@ -451,7 +465,6 @@ def session_header_extra():
         except Exception:
             lines.append(
                 f"Lab check ({machine}): Couldn't reach the approved lab list. "
-                "Contact Tristan or Jalen ASAP. Do not continue until you hear back. "
-                "You can still go on."
+                "Check with the Team lead. You can still go on."
             )
     return "\n".join(lines) + "\n"

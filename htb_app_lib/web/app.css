@@ -279,6 +279,31 @@ button { cursor: pointer; }
 }
 .rail-btn:hover { color: var(--text); }
 .rail-btn.active { color: var(--copper-hot); border-left-color: var(--copper); background: var(--rail-active-bg); }
+.rail-btn.rail-check,
+.rail-btn.rail-check:hover,
+.rail-btn.rail-check.active {
+  color: #3ddc84;
+  font-weight: 700;
+}
+.rail-btn.rail-check.active { border-left-color: #3ddc84; background: var(--rail-active-bg); }
+.lab-verdict {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0.2rem 0;
+}
+.lab-verdict.approved { color: #3ddc84; }
+.lab-verdict.rejected { color: #ff5c5c; }
+.lab-verdict.unsure { color: #f0a030; }
+.approved-lab-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.approved-lab-list button {
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--text);
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+.approved-lab-list button:hover { border-color: #3ddc84; color: #3ddc84; }
 
 main { overflow: hidden; min-width: 0; }
 .tab { display: none; height: 100%; padding: 0.8rem 1rem; overflow: auto; }

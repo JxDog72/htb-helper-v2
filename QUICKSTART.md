@@ -149,7 +149,7 @@ Students stay in the folder they cloned and stay on `main`. When the terminal sa
 
 A second folder checked out on `dev` is the test copy. It prints `Dev build` and the latest student release. `git pull` in that folder does not switch it to the student release.
 
-Status → **Check lab**. Approved labs are clear as of the list date. Any other name: contact Tristan before you start. If the list cannot be downloaded, contact Tristan or Jalen as soon as you can and wait to hear back. You can still go on. Nothing in `machines/` is deleted.
+**Check Lab** (green, under Settings) opens when you enter a lab name. Green means approved. Red means not approved. Orange means check with the Team lead. If the list cannot be downloaded, you can still go on. Nothing in `machines/` is deleted.
 
 ## 8. Stop the helper
 

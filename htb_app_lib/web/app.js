@@ -1,5 +1,5 @@
 (() => {
-  const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "convert", "status", "ctf", "help", "lab", "settings"];
+  const TABS = ["notes", "logs", "tools", "info", "evidence", "files", "report", "convert", "status", "ctf", "help", "lab", "settings", "checklab"];
   const SETTINGS_KEY = "htb-settings";
   const THEMES = [
     { id: "field", name: "Field notebook", blurb: "Copper on dark paper (default)" },
@@ -327,6 +327,7 @@
     if (name === "files") refreshFiles();
     if (name === "evidence") refreshEvidence();
     if (name === "status") refreshStatus();
+    if (name === "checklab") loadApprovedLabs();
     if (name === "info") renderInfo();
     if (name === "ctf") renderCtf();
     if (name === "tools" && !state.toolsLoaded) loadTools();
@@ -442,7 +443,7 @@
     return data;
   }
 
-  async function chooseLabDone() {
+  async function chooseLabDone(checkName) {
     state.labChosen = true;
     state.toolsLoaded = false;
     state.currentTool = null;
@@ -450,8 +451,59 @@
     await refreshState();
     await loadNotes();
     await loadReport();
+    const name = (checkName || "").trim();
+    if (name && name !== "—") {
+      await showLabCheck(name);
+      return;
+    }
     const start = loadSettings().startTab;
     setTab(TABS.includes(start) ? start : "help");
+  }
+
+  function paintLabCheck(data) {
+    const head = $("lab-check-headline");
+    const detail = $("lab-check-detail");
+    if (!head || !detail) return;
+    const tone = (data && data.tone) || "unsure";
+    head.className = "lab-verdict " + tone;
+    head.textContent = (data && data.headline) || "CHECK WITH THE TEAM LEAD";
+    detail.textContent = (data && data.message) || "";
+  }
+
+  async function runLabCheck(name) {
+    const query = (name || "").trim();
+    if ($("lab-check-name") && query) $("lab-check-name").value = query;
+    paintLabCheck({ tone: "unsure", headline: "Checking…", message: "" });
+    try {
+      const data = await api("/api/lab-check?name=" + encodeURIComponent(query));
+      paintLabCheck(data);
+    } catch (err) {
+      paintLabCheck({
+        tone: "unsure",
+        headline: "CHECK WITH THE TEAM LEAD",
+        message: err.message,
+      });
+    }
+  }
+
+  async function showLabCheck(name) {
+    setTab("checklab");
+    await runLabCheck(name);
+  }
+
+  async function loadApprovedLabs() {
+    const box = $("approved-lab-list");
+    if (!box) return;
+    const catalog = await api("/api/lab-check").catch(() => null);
+    if (!catalog || !catalog.ok) {
+      box.innerHTML = "<p class='quiet'>Approved list could not be loaded. Check with the Team lead. You can still go on.</p>";
+      return;
+    }
+    if ($("block-unapproved")) $("block-unapproved").checked = !!catalog.block_unapproved_labs;
+    const approved = (catalog.names || []).filter((lab) => lab.status === "approved");
+    box.innerHTML = approved.map((lab) => (
+      `<button type="button" data-lab="${escapeHtml(lab.name)}">${escapeHtml(lab.name)}</button>`
+    )).join("");
   }
 
   function speedUpOn() {
@@ -506,17 +558,6 @@
         ? (release.detail_lines || [])
         : (release.update_available ? (release.terminal_lines || []) : (release.detail_lines || []));
       $("release-detail").textContent = lines.join("\n");
-    }
-    const catalog = await api("/api/lab-check").catch(() => null);
-    if (catalog && $("lab-check-names")) {
-      $("lab-check-names").innerHTML = (catalog.names || []).map((lab) => (
-        `<option value="${escapeHtml(lab.name)}"></option>`
-      )).join("");
-      if ($("block-unapproved")) $("block-unapproved").checked = !!catalog.block_unapproved_labs;
-    }
-    const machine = ($("meta-machine") && $("meta-machine").textContent) || "";
-    if ($("lab-check-name") && !$("lab-check-name").value && machine && machine !== "—") {
-      $("lab-check-name").value = machine;
     }
     const pre = await api("/api/preflight");
     $("preflight-list").innerHTML = (pre.checks || []).map((c) => (
@@ -1022,6 +1063,7 @@
           bits.push("Renamed " + data.archives.length + " export archive(s).");
         }
         msgEl.textContent = bits.join(" ");
+        await showLabCheck((data.config && data.config.machine_name) || $("lab-machine").value);
       } catch (err) {
         errEl.classList.remove("hidden");
         errEl.textContent = err.message;
@@ -1137,11 +1179,7 @@
             research_project: fd.get("research_project"),
           }),
         });
-        const labCheck = created && created.lab_check;
-        if (labCheck && labCheck.message && labCheck.status !== "approved") {
-          alert(labCheck.message);
-        }
-        await chooseLabDone();
+        await chooseLabDone(fd.get("machine_name"));
       } catch (err) {
         $("setup-error").hidden = false;
         $("setup-error").textContent = err.message;
@@ -1153,12 +1191,13 @@
     $("btn-open-lab").addEventListener("click", async () => {
       $("setup-error").hidden = true;
       try {
-        await api("/api/labs/select", {
+        const opened = await api("/api/labs/select", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: $("lab-select").value }),
         });
-        await chooseLabDone();
+        const openedName = opened && opened.config && opened.config.machine_name;
+        await chooseLabDone(openedName || "");
       } catch (err) {
         $("setup-error").hidden = false;
         $("setup-error").textContent = err.message;
@@ -1171,7 +1210,9 @@
           headers: { "Content-Type": "application/json" },
           body: "{}",
         });
-        await chooseLabDone();
+        const ready = await api("/api/state");
+        const readyName = ready && ready.config && ready.config.machine_name;
+        await chooseLabDone(readyName || "");
       } catch (err) {
         $("setup-error").hidden = false;
         $("setup-error").textContent = err.message;
@@ -1550,15 +1591,17 @@
       refreshStatus();
     });
     if ($("btn-lab-check")) {
-      $("btn-lab-check").addEventListener("click", async () => {
-        const name = ($("lab-check-name").value || "").trim();
-        $("lab-check-out").textContent = "Checking…";
-        try {
-          const data = await api("/api/lab-check?name=" + encodeURIComponent(name));
-          $("lab-check-out").textContent = data.message || "";
-        } catch (err) {
-          $("lab-check-out").textContent = err.message;
-        }
+      $("btn-lab-check").addEventListener("click", () => {
+        runLabCheck($("lab-check-name").value).catch((err) => {
+          paintLabCheck({ tone: "unsure", headline: "CHECK WITH THE TEAM LEAD", message: err.message });
+        });
+      });
+    }
+    if ($("approved-lab-list")) {
+      $("approved-lab-list").addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-lab]");
+        if (!btn) return;
+        runLabCheck(btn.getAttribute("data-lab")).catch(() => {});
       });
     }
     if ($("block-unapproved")) {

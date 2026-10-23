@@ -81,7 +81,7 @@ git checkout dev
 
 Do not delete either folder. `machines/`, notes, logs, and `config.json` are not in git.
 
-Status → **Check lab** reads the public list. Approved means no public writeup was found as of the list date. Anything else: contact Tristan before starting. If the list cannot be downloaded: contact Tristan or Jalen as soon as you can, and wait to hear back. You can still go on. The helper does not delete the lab folder.
+**Check Lab** (green, under Settings) opens when a lab name is entered. Green means approved. Red means not approved. Orange means check with the Team lead. If the list cannot be downloaded, you can still go on. The helper does not delete the lab folder.
 
 See `RELEASING.md` before putting a build on `main` for students.
 
