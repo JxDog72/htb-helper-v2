@@ -1,5 +1,7 @@
 # Update HTB Helper
 
+In VS Code, press Ctrl+Shift+V to open the preview. That shows this file with the headings and steps laid out, instead of the raw marks.
+
 Use the folder you already cloned. Stay on `main`. This update does not delete lab folders, notes, logs, or `config.json`.
 
 Some folders are several commits behind. Some are already up to date and still need this version started again. One pull covers both.
