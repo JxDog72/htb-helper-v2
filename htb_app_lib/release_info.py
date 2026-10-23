@@ -387,9 +387,13 @@ def check_lab(name):
     if match is None:
         result["ok"] = True
         result["status"] = "unknown"
-        result["tone"] = "rejected"
-        result["headline"] = f"{query} — NOT APPROVED"
-        result["message"] = unknown
+        result["tone"] = "unsure"
+        result["headline"] = f"{query} — NOT ON THE LIST"
+        result["message"] = (
+            "This lab is not on the approved list. Reach out to the Team Lead."
+        )
+        if source == "dev-copy":
+            result["message"] += " Lab list is the copy in this dev folder."
         return result
     status = str(match.get("status") or "").strip().lower()
     posted = str(match.get("posted") or "").strip()

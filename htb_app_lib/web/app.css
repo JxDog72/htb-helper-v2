@@ -256,6 +256,7 @@ button { cursor: pointer; }
 .meta dd { margin: 0.1rem 0 0; font-family: var(--font-mono); font-size: 0.85rem; color: var(--copper-hot); }
 #meta-approval.approved { color: #3ddc84; font-weight: 700; }
 #meta-approval.rejected { color: #ff5c5c; font-weight: 700; }
+#meta-approval.unsure { color: #ffb020; font-weight: 700; }
 .top-actions { display: flex; align-items: center; gap: 0.7rem; }
 .quiet { color: var(--quiet); font-size: 0.8rem; }
 .lede { color: var(--quiet); max-width: 48rem; line-height: 1.45; }
@@ -294,6 +295,12 @@ button { cursor: pointer; }
   color: #ff5c5c;
   border-left-color: #ff5c5c;
 }
+.rail-btn.rail-check.unsure,
+.rail-btn.rail-check.unsure:hover,
+.rail-btn.rail-check.unsure.active {
+  color: #ffb020;
+  border-left-color: #ffb020;
+}
 .lab-verdict {
   font-size: 1.7rem;
   font-weight: 700;
@@ -302,8 +309,15 @@ button { cursor: pointer; }
 }
 .lab-verdict.approved { color: #3ddc84; }
 .lab-verdict.rejected { color: #ff5c5c; }
+.lab-verdict.unsure { color: #ffb020; }
 #lab-check-detail.warning {
   color: #ff5c5c;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+#lab-check-detail.caution {
+  color: #ffb020;
   font-size: 1.35rem;
   font-weight: 700;
   line-height: 1.35;
@@ -487,6 +501,8 @@ label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.82rem;
   font-weight: 700;
   line-height: 1.35;
 }
+.setup-unapproved.unsure { border-color: #ffb020; }
+.setup-unapproved.unsure #setup-unapproved-detail { color: #ffb020; }
 .setup-card h1 { margin: 0; font-size: 1.5rem; color: var(--copper); }
 .setup-card h2 { margin: 1rem 0 0.4rem; font-size: 0.82rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--blue); }
 

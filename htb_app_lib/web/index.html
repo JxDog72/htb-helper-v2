@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=29" />
+  <link rel="stylesheet" href="/app.css?v=30" />
   <script>
     try {
       var s = JSON.parse(localStorage.getItem("htb-settings") || "{}");
@@ -374,7 +374,7 @@
           <h3>Version and lab list</h3>
           <p>Students stay on <code>main</code>. When a newer release exists, the terminal and Status tell you, and give a <code>git pull --ff-only</code> command. <code>./htb --no-update-check</code> skips that lookup.</p>
           <p>A <code>dev</code> checkout says <code>Dev build</code> and the latest student release. It does not ask you to update over your test copy.</p>
-          <p><strong>Check Lab</strong> (under Settings) is green when the open lab is approved. If the lab is not approved, that tab stays red and shows a warning. The header beside Session says <strong>Approved</strong> or <strong>Not approved</strong> for the open lab. Creating that lab asks you to acknowledge the warning, then opens the workspace. The approved list shows each lab's field (AI, ICS, or General) and difficulty.</p>
+          <p><strong>Check Lab</strong> (under Settings) is green when the open lab is approved. If the lab is not approved, that tab stays red and shows a warning. If the name is not on the list, the warning is orange and says to reach out to the Team Lead. That tab stays orange while the lab is open. The header beside Session matches the open lab. Creating that lab asks you to acknowledge the warning, then opens the workspace. The approved list shows each lab's field (AI, ICS, or General) and difficulty.</p>
 
           <h3>First install (Parrot / Kali)</h3>
           <pre class="syntax">git clone https://github.com/JxDog72/htb-helper-v2.git
@@ -547,7 +547,7 @@ git pull
 
       <section id="tab-checklab" class="tab">
         <h2>Check lab</h2>
-        <p class="lede">Green is approved. Red is not approved. You can keep working either way.</p>
+        <p class="lede">Green is approved. Red is not approved. Orange means the name is not on the list: reach out to the Team Lead. You can keep working.</p>
         <p id="lab-check-headline" class="lab-verdict"></p>
         <p id="lab-check-detail" class="lede"></p>
         <label>Lab name
@@ -561,6 +561,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=46"></script>
+  <script src="/app.js?v=47"></script>
 </body>
 </html>

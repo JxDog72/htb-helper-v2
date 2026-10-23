@@ -479,15 +479,21 @@
   function paintOpenLabMark(tone) {
     const rail = document.querySelector(".rail-btn.rail-check");
     const mark = $("meta-approval");
-    if (rail) rail.classList.toggle("unapproved", tone === "rejected");
+    if (rail) {
+      rail.classList.toggle("unapproved", tone === "rejected");
+      rail.classList.toggle("unsure", tone === "unsure");
+    }
     if (!mark) return;
-    mark.classList.remove("approved", "rejected");
+    mark.classList.remove("approved", "rejected", "unsure");
     if (tone === "approved") {
       mark.textContent = "Approved";
       mark.classList.add("approved");
     } else if (tone === "rejected") {
       mark.textContent = "Not approved";
       mark.classList.add("rejected");
+    } else if (tone === "unsure") {
+      mark.textContent = "Ask Team Lead";
+      mark.classList.add("unsure");
     } else {
       mark.textContent = "—";
     }
@@ -502,6 +508,7 @@
       head.textContent = (data && data.headline) || "";
       detail.textContent = (data && data.message) || "";
       detail.classList.toggle("warning", tone === "rejected");
+      detail.classList.toggle("caution", tone === "unsure");
     }
     if (forOpen) paintOpenLabMark(tone);
   }
@@ -543,7 +550,7 @@
     }
     if (detail) {
       detail.textContent = "";
-      detail.classList.remove("warning");
+      detail.classList.remove("warning", "caution");
     }
     const sticks = !!forOpen || openLabMatches(query);
     try {
@@ -1262,14 +1269,23 @@
     });
     function hideUnapprovedAck() {
       const box = $("setup-unapproved");
-      if (box) box.classList.add("hidden");
+      if (!box) return;
+      box.classList.add("hidden");
+      box.classList.remove("unsure");
     }
 
-    function showUnapprovedAck(headline, message) {
+    function showUnapprovedAck(headline, message, tone) {
       const box = $("setup-unapproved");
       if (!box) return;
-      $("setup-unapproved-headline").textContent = headline || "NOT APPROVED";
-      $("setup-unapproved-detail").textContent = message || "This lab is not approved. You can keep using HTB Helper.";
+      const unsure = tone === "unsure";
+      $("setup-unapproved-headline").className = "lab-verdict " + (unsure ? "unsure" : "rejected");
+      $("setup-unapproved-headline").textContent = headline || (unsure ? "NOT ON THE LIST" : "NOT APPROVED");
+      $("setup-unapproved-detail").textContent = message || (
+        unsure
+          ? "This lab is not on the approved list. Reach out to the Team Lead."
+          : "This lab is not approved. You can keep using HTB Helper."
+      );
+      box.classList.toggle("unsure", unsure);
       box.classList.remove("hidden");
       $("setup-error").hidden = true;
     }
@@ -1308,15 +1324,15 @@
       if (createBtn) createBtn.disabled = true;
       try {
         const checked = await api("/api/lab-check?name=" + encodeURIComponent(name));
-        if (checked && checked.tone === "rejected") {
-          showUnapprovedAck(checked.headline, checked.message);
+        if (checked && (checked.tone === "rejected" || checked.tone === "unsure")) {
+          showUnapprovedAck(checked.headline, checked.message, checked.tone);
           return;
         }
         await postWorkspace(fd, false);
         await chooseLabDone(name);
       } catch (err) {
         if (err.needsAck) {
-          showUnapprovedAck(err.headline, err.detail || err.message);
+          showUnapprovedAck(err.headline, err.detail || err.message, "rejected");
           return;
         }
         $("setup-error").hidden = false;

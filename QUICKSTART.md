@@ -149,7 +149,7 @@ Students stay in the folder they cloned and stay on `main`. When the terminal sa
 
 A second folder checked out on `dev` is the test copy. It prints `Dev build` and the latest student release. `git pull` in that folder does not switch it to the student release.
 
-**Check Lab** (under Settings) opens when you enter a lab name. Green means approved. Red means not approved, and that tab stays red while the lab is open. The header beside Session says Approved or Not approved for that open lab. Create workspace shows that warning and an Acknowledge and continue button, then opens the lab. The approved list shows each lab's field (AI, ICS, or General) and difficulty.
+**Check Lab** (under Settings) opens when you enter a lab name. Green means approved. Red means not approved, and that tab stays red while the lab is open. Orange means the name is not on the list: reach out to the Team Lead, and that tab stays orange while the lab is open. The header beside Session matches the open lab. Create workspace shows that warning and an Acknowledge and continue button, then opens the lab. The approved list shows each lab's field (AI, ICS, or General) and difficulty.
 
 ## 8. Stop the helper
 
