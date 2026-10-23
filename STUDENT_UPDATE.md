@@ -4,13 +4,15 @@ Use the folder you already cloned. Stay on `main`. This update does not delete l
 
 Being several commits behind is normal. One pull brings all of them.
 
-## 1. Stop the helper
+## 1. Close it if it is open
+
+Close HTB Helper before you update. Close the browser tab. Then stop the program.
 
 If a terminal is running `./htb`, type `exit`, then press Ctrl+C in that same window.
 
 `exit` closes the logged shell. Ctrl+C stops the helper.
 
-If you started it by clicking the `htb` file, open any terminal and run:
+If you started it by clicking the `htb` file and there is no terminal, open any terminal and run:
 
 ```bash
 pkill -f htb_app.py
