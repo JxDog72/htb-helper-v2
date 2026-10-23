@@ -8,42 +8,98 @@ Being several commits behind is normal. One pull brings all of them.
 
 If a terminal is running `./htb`, type `exit`, then press Ctrl+C in that same window.
 
+`exit` closes the logged shell. Ctrl+C stops the helper.
+
 If you started it by clicking the `htb` file, open any terminal and run:
 
 ```bash
 pkill -f htb_app.py
 ```
 
+`pkill -f htb_app.py` stops a helper that was left running with no terminal.
+
 ## 2. Go to the helper folder
 
-This is the folder that contains the `htb` file.
+This is the folder that contains the `htb` file. If you cloned it in your home folder, run:
 
 ```bash
 cd ~/htb-helper-v2
 ```
 
-If `git status` says `not a git repository`, you are in the folder above it. Run `ls`, then `cd` into the inner folder and try again.
+`cd ~/htb-helper-v2` moves the terminal into that folder. Use your real path if the folder lives somewhere else.
+
+Check that you are in the right place:
+
+```bash
+git status
+```
+
+`git status` shows whether this folder is the helper and whether an update is waiting.
+
+If it says `not a git repository`, you are in the folder above it. List what is here, then move into the inner folder:
+
+```bash
+ls
+cd htb-helper-v2
+```
+
+`ls` prints the names in the current folder. `cd htb-helper-v2` moves into the inner folder. Then run `git status` again.
 
 ## 3. Update
 
+Confirm this folder downloads from the class repository:
+
 ```bash
 git remote -v
+```
+
+`git remote -v` prints the address this folder updates from. It should show `https://github.com/JxDog72/htb-helper-v2.git`.
+
+See how many updates you are behind:
+
+```bash
 git status
+```
+
+`git status` may say the branch is behind by several commits and can be fast-forwarded. That is the message you want.
+
+Download them:
+
+```bash
 git pull --ff-only
+```
+
+`git pull --ff-only` downloads every waiting update in one step. It does not mix in extra changes, and it leaves your lab folders alone.
+
+Start the helper:
+
+```bash
 ./htb
 ```
 
-`git remote -v` should show `https://github.com/JxDog72/htb-helper-v2.git`.
+`./htb` starts HTB Helper on Linux.
 
-`git status` may say the branch is behind by several commits and can be fast-forwarded. That is the message you want. `git pull --ff-only` downloads every one of those commits.
+On Windows, use the same `git` commands in the helper folder, then start it with:
 
-On Windows, use the same `git` commands in the helper folder, then start with `htb.cmd`.
+```bat
+htb.cmd
+```
+
+`htb.cmd` starts HTB Helper on Windows.
 
 ## 4. If the pull stops
 
 Copy the full message and send it to the Team Lead. Leave the folder as it is.
 
-Do not run `git reset --hard`, `git clean`, or `git stash -u`.
+Do not run these:
+
+```bash
+git reset --hard
+git clean
+git stash -u
+```
+
+`git reset --hard` throws away local edits. `git clean` deletes files git is not tracking. `git stash -u` hides files, including ones you may still need. None of these is part of the update.
 
 ## Ask for a lab to be checked
 
@@ -52,10 +108,10 @@ You can open a pull request when you want a lab name checked. The request is the
 Do not include a link, a hint, a flag, or a password. Do not merge the request. The Team Lead checks the lab and updates the list.
 
 1. Open [labs/CHECK_REQUESTS.md](https://github.com/JxDog72/htb-helper-v2/blob/main/labs/CHECK_REQUESTS.md).
-2. Click the pencil icon.
-3. GitHub will ask you to fork the repository. Accept that.
+2. Click the pencil icon. That lets you edit the page.
+3. GitHub will ask you to fork the repository. Accept that. A fork is your own copy where the edit can live.
 4. Add one new line: `Your Lab Name — please check this lab.`
-5. Click **Propose changes**, then **Create pull request**.
-6. Stop there.
+5. Click **Propose changes**, then **Create pull request**. That sends the lab name to the Team Lead.
+6. Stop there. Do not click merge.
 
 Sending the Team Lead the lab name is enough if you do not want to open a pull request.
