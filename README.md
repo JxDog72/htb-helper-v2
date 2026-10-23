@@ -1,4 +1,4 @@
-Inspired by: https://github.com/tjoliveros25/htb-research-helper.git
+# Inspired by: https://github.com/tjoliveros25/htb-research-helper.git
 
 # HTB Helper 2.0
 
