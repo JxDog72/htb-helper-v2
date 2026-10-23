@@ -93,16 +93,6 @@ htb.cmd
 
 Copy the full message and send it to the Team Lead. Leave the folder as it is.
 
-Do not run these:
-
-```bash
-git reset --hard
-git clean
-git stash -u
-```
-
-`git reset --hard` throws away local edits. `git clean` deletes files git is not tracking. `git stash -u` hides files, including ones you may still need. None of these is part of the update.
-
 ## Ask for a lab to be checked
 
 You can open a pull request when you want a lab name checked. The request is the lab name only.
