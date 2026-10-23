@@ -31,6 +31,7 @@ import uuid
 import webbrowser
 
 import htb_helper as engine
+import release_info
 from session_capture import (
     append_to_session_log,
     decode_log_bytes,
@@ -54,7 +55,7 @@ from tools_catalog import (
 LIB = Path(__file__).resolve().parent
 ROOT = LIB.parent
 WEB = LIB / "web"
-APP_VERSION = "2.0.0"
+APP_VERSION = release_info.APP_VERSION
 DEFAULT_PORT = 8765
 
 STATE = {
@@ -177,6 +178,7 @@ def select_lab(folder_name: str):
             prev.get("research_project", "HTB Enterprise AI Generated Pentest Report Study"),
         ),
         "gui_port": prev.get("gui_port", DEFAULT_PORT),
+        "block_unapproved_labs": bool(prev.get("block_unapproved_labs")),
         "lab_folder": folder.name,
     }
     save_config(STATE["config_path"], config)
@@ -1618,7 +1620,20 @@ class Handler(BaseHTTPRequestHandler):
                     "labs": list_labs(),
                     "current_lab": STATE["workspace"].name if STATE["workspace"] else None,
                     "os_name": os.name,
+                    "block_unapproved_labs": bool(config.get("block_unapproved_labs")),
                 })
+                return
+            if path == "/api/release":
+                self._json(release_info.update_status())
+                return
+            if path == "/api/lab-check":
+                name = (query.get("name") or [""])[0]
+                if not name:
+                    payload = release_info.lab_names()
+                    payload["block_unapproved_labs"] = bool((STATE["config"] or {}).get("block_unapproved_labs"))
+                    self._json(payload)
+                    return
+                self._json(release_info.check_lab(name))
                 return
             if path == "/api/labs":
                 self._json({
@@ -1727,18 +1742,28 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
+            if path == "/api/config/block":
+                current = dict(STATE["config"] or {})
+                current["block_unapproved_labs"] = bool(data.get("block_unapproved_labs"))
+                save_config(STATE["config_path"], current)
+                STATE["config"] = current
+                self._json({"ok": True, "block_unapproved_labs": current["block_unapproved_labs"]})
+                return
+
             if path == "/api/config":
+                previous = STATE["config"] or {}
                 config = {
                     "student_id": str(data.get("student_id") or "").strip(),
                     "machine_name": str(data.get("machine_name") or "").strip(),
                     "target_ip": str(data.get("target_ip") or "").strip(),
                     "target_port": data.get("target_port"),
-                    "workspace_root": (STATE["config"] or {}).get("workspace_root", "./machines"),
+                    "workspace_root": previous.get("workspace_root", "./machines"),
                     "research_project": str(
                         data.get("research_project")
                         or "HTB Enterprise AI Generated Pentest Report Study"
                     ).strip(),
-                    "gui_port": DEFAULT_PORT,
+                    "gui_port": previous.get("gui_port", DEFAULT_PORT),
+                    "block_unapproved_labs": bool(previous.get("block_unapproved_labs")),
                 }
                 if config["target_port"] in ("", None):
                     config["target_port"] = None
@@ -1748,10 +1773,27 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"error": "Invalid configuration. Check student id, machine name, and target IP."}, 400)
                     return
                 config.pop("lab_folder", None)
+                destination = engine.workspace_from_config(config)
+                checked = release_info.check_lab(config["machine_name"])
+                if (
+                    not Path(destination).exists()
+                    and config.get("block_unapproved_labs")
+                    and checked.get("reachable")
+                    and checked.get("status") == "rejected"
+                ):
+                    self._json({"error": checked.get("message") or "That lab is not approved."}, 400)
+                    return
                 save_config(STATE["config_path"], config)
                 apply_config(config, STATE["config_path"])
                 STATE["session_ready"].set()
-                self._json({"ok": True, "workspace": str(STATE["workspace"])})
+                self._json({
+                    "ok": True,
+                    "workspace": str(STATE["workspace"]),
+                    "lab_check": {
+                        "status": checked.get("status") or "",
+                        "message": checked.get("message") or "",
+                    },
+                })
                 return
 
             if path == "/api/lab/target":
@@ -2163,6 +2205,7 @@ def print_banner(url: str):
     print("=" * 60)
     print(f" HTB Helper {APP_VERSION}  —  local field notebook")
     print("=" * 60)
+    release_info.print_release_status()
     engine.print_keep_terminal_warning()
     print(f" GUI:      {url}")
     print(" Bind:     127.0.0.1 only (this machine)")
@@ -2186,6 +2229,7 @@ def parse_args():
     parser.add_argument("--no-bootstrap", action="store_true", help="Skip apt install of python3/nmap/bsdutils/xdg-utils on start.")
     parser.add_argument("--logged-shell", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--no-update-check", action="store_true", help="Skip the GitHub release and lab-list lookups.")
     parser.add_argument("--version", action="version", version=f"htb-helper {APP_VERSION}")
     return parser.parse_args()
 
@@ -2193,6 +2237,8 @@ def parse_args():
 def main():
     os.chdir(ROOT)
     args = parse_args()
+    if args.no_update_check:
+        release_info.SKIP_NETWORK = True
     config_path = Path(args.config).expanduser()
     if not config_path.is_absolute():
         config_path = (ROOT / config_path).resolve()

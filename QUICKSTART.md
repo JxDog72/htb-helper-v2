@@ -143,7 +143,15 @@ In `./htb --cli`, option **14** views/changes the machine name or starts a new l
 
 In the GUI, **Lab-Config** (bottom of the left rail) changes this lab's student ID, machine name, target IP, and assigned port. A new student ID or machine name moves `machines/student_machine/` and matching zip/7z exports (including the `student_machine_logs` folders inside a zip).
 
-## 7. Stop the helper
+## 7. Version and lab check
+
+Students stay in the folder they cloned and stay on `main`. When the terminal says a new release is out, run the `git pull --ff-only` command it prints.
+
+A second folder checked out on `dev` is the test copy. It prints `Dev build` and the latest student release. `git pull` in that folder does not switch it to the student release.
+
+Status → **Check lab**. Approved labs are clear as of the list date. Any other name: contact Tristan before you start. If the list cannot be downloaded, contact Tristan or Jalen as soon as you can and wait to hear back. You can still go on. Nothing in `machines/` is deleted.
+
+## 8. Stop the helper
 
 Start with `./htb` in a terminal. Type `exit` in the logged shell, then Ctrl+C in that same window.
 

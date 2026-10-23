@@ -499,6 +499,25 @@
   }
 
   async function refreshStatus() {
+    const release = await api("/api/release").catch(() => null);
+    if (release && $("release-line")) {
+      $("release-line").textContent = release.status_line || "";
+      const lines = release.dev
+        ? (release.detail_lines || [])
+        : (release.update_available ? (release.terminal_lines || []) : (release.detail_lines || []));
+      $("release-detail").textContent = lines.join("\n");
+    }
+    const catalog = await api("/api/lab-check").catch(() => null);
+    if (catalog && $("lab-check-names")) {
+      $("lab-check-names").innerHTML = (catalog.names || []).map((lab) => (
+        `<option value="${escapeHtml(lab.name)}"></option>`
+      )).join("");
+      if ($("block-unapproved")) $("block-unapproved").checked = !!catalog.block_unapproved_labs;
+    }
+    const machine = ($("meta-machine") && $("meta-machine").textContent) || "";
+    if ($("lab-check-name") && !$("lab-check-name").value && machine && machine !== "—") {
+      $("lab-check-name").value = machine;
+    }
     const pre = await api("/api/preflight");
     $("preflight-list").innerHTML = (pre.checks || []).map((c) => (
       `<li>${c.ok ? "PASS" : "FAIL"} — ${escapeHtml(c.name)} <span class="quiet">${escapeHtml(c.detail || "")}</span></li>`
@@ -1107,7 +1126,7 @@
       $("setup-error").hidden = true;
       const fd = new FormData($("setup-form"));
       try {
-        await api("/api/config", {
+        const created = await api("/api/config", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1118,6 +1137,10 @@
             research_project: fd.get("research_project"),
           }),
         });
+        const labCheck = created && created.lab_check;
+        if (labCheck && labCheck.message && labCheck.status !== "approved") {
+          alert(labCheck.message);
+        }
         await chooseLabDone();
       } catch (err) {
         $("setup-error").hidden = false;
@@ -1526,6 +1549,31 @@
       alert(data.message || JSON.stringify(data));
       refreshStatus();
     });
+    if ($("btn-lab-check")) {
+      $("btn-lab-check").addEventListener("click", async () => {
+        const name = ($("lab-check-name").value || "").trim();
+        $("lab-check-out").textContent = "Checking…";
+        try {
+          const data = await api("/api/lab-check?name=" + encodeURIComponent(name));
+          $("lab-check-out").textContent = data.message || "";
+        } catch (err) {
+          $("lab-check-out").textContent = err.message;
+        }
+      });
+    }
+    if ($("block-unapproved")) {
+      $("block-unapproved").addEventListener("change", async () => {
+        try {
+          await api("/api/config/block", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ block_unapproved_labs: $("block-unapproved").checked }),
+          });
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+    }
     document.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();

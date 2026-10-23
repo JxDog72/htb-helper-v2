@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-HTB Enterprise Research Study Helper v3.4.0
+HTB Enterprise Research Study Helper. Version comes from the VERSION file.
 
 Purpose:
     Collect consistent, timestamped research data during an authorized
@@ -45,9 +45,10 @@ import time
 import zipfile
 from urllib.parse import urlparse
 
+from release_info import APP_VERSION
+
 
 APP_NAME = "HTB Enterprise Research Study Helper"
-APP_VERSION = "3.4.0"
 MAX_ANALYSIS_CHARS = 2_000_000
 MAX_NOTE_FINDINGS = 25
 ANSI_RE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|].*?(?:\x07|\x1b\\))")
@@ -3011,7 +3012,10 @@ def load_lab_metadata(folder):
 
 def write_lab_metadata(workspace, config):
     path = metadata_path(workspace)
+    first_write = not path.exists()
     existing = load_lab_metadata(workspace)
+    if first_write and not existing.get("created_with"):
+        existing["created_with"] = APP_VERSION
     existing.update({
         "helper_version": APP_VERSION,
         "student_id": config["student_id"],
@@ -3427,6 +3431,11 @@ def main():
     print("=" * 60)
     print(APP_NAME)
     print("=" * 60)
+    try:
+        from release_info import print_release_status
+        print_release_status()
+    except Exception:
+        pass
 
     config = load_config(args.config)
     if not validate_config(config):
