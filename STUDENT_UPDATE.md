@@ -91,7 +91,19 @@ htb.cmd
 
 ## 4. If the pull stops
 
-Copy the full message and send it to the Team Lead. Leave the folder as it is.
+Read the message in the terminal.
+
+If it says your local changes would be overwritten, or asks you to commit or stash, set those edits aside, pull, then put them back:
+
+```bash
+git stash
+git pull --ff-only
+git stash pop
+```
+
+`git stash` sets aside edits to files git is tracking so the pull can finish. Your lab folders, notes, and `config.json` stay on disk. `git pull --ff-only` downloads the update. `git stash pop` puts those edits back.
+
+If the message says something else, copy the full message and send it to the Team Lead. Then run `./htb` again after the Team Lead tells you the folder is ready.
 
 ## Ask for a lab to be checked
 
