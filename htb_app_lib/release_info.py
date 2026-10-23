@@ -410,7 +410,7 @@ def check_lab(name):
         message = unknown
         status = "pending"
     if source == "dev-copy":
-        message += " Lab list is the copy in this dev folder. Students read the list from main."
+        message += " Lab list is the copy in this dev folder."
     label = str(match.get("name") or query)
     if status == "approved":
         tone, headline = "approved", f"{label} — APPROVED"
