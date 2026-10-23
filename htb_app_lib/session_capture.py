@@ -210,15 +210,25 @@ def _set_windows_stdin(stream):
     _windows_stdin = stream
 
 
+def _session_banner(shell_line: str) -> str:
+    try:
+        from release_info import session_header_extra
+        extra = session_header_extra()
+    except Exception:
+        extra = ""
+    return (
+        "===== HTB Helper session log (console capture) =====\n"
+        f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"Shell: {shell_line}\n"
+        f"{extra}"
+        "====================================================\n"
+    )
+
+
 def _run_windows(log_file: Path) -> int:
     set_inject_log(log_file)
     encoding = sys.stdout.encoding or "utf-8"
-    header = (
-        f"===== HTB Helper session log (console capture) =====\n"
-        f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        f"Shell: {os.environ.get('COMSPEC') or r'C:\\Windows\\System32\\cmd.exe'}\n"
-        f"====================================================\n"
-    )
+    header = _session_banner(os.environ.get("COMSPEC") or r"C:\Windows\System32\cmd.exe")
     log = log_file.open("a", encoding="utf-8", errors="replace")
     log.write(header)
     log.flush()
@@ -254,12 +264,7 @@ def _run_unix(log_file: Path) -> int:
     shell = os.environ.get("SHELL") or "/bin/bash"
     _pause.clear()
     log = log_file.open("a", encoding="utf-8", errors="replace")
-    log.write(
-        f"===== HTB Helper session log (console capture) =====\n"
-        f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        f"Shell: {shell}\n"
-        f"====================================================\n"
-    )
+    log.write(_session_banner(shell))
     log.flush()
     _log_fp = log
     print("[+] Console capture is ON. Pause/Resume is in the Session menu in the GUI.")
@@ -395,12 +400,7 @@ def _run_windows_piped(log_file: Path, log=None, encoding=None) -> int:
     _pause.clear()
     if log is None:
         log = log_file.open("a", encoding="utf-8", errors="replace")
-        log.write(
-            f"===== HTB Helper session log (console capture) =====\n"
-            f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"Shell: {comspec}\n"
-            f"====================================================\n"
-        )
+        log.write(_session_banner(comspec))
         log.flush()
         _log_fp = log
     log_lock = _log_lock

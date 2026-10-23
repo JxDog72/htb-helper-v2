@@ -66,6 +66,25 @@ chmod +x htb install.sh   # needed once if git lost the execute bit
 
 Do **not** use `sudo ./htb`. If you see `Permission denied`, run `chmod +x htb` or `bash ./htb`.
 
+## Students and the dev copy
+
+Students clone once and stay on `main`. The update steps are in [STUDENT_UPDATE.md](STUDENT_UPDATE.md). The terminal and the Status tab say when a newer release exists, and they print the exact `git pull --ff-only` command. `./htb --no-update-check` skips that lookup.
+
+The test copy is a second folder on the `dev` branch. Its terminal says `Dev build v2.1.0 (dev @ abc1234)` and `Latest student release: vX.Y.Z`. It does not tell you to pull `main` over the test copy. Day to day, `git pull` inside the dev folder stays on `dev`.
+
+```bash
+git clone https://github.com/JxDog72/htb-helper-v2.git htb-helper-dev
+cd htb-helper-dev
+git checkout dev
+./htb
+```
+
+Do not delete either folder. `machines/`, notes, logs, and `config.json` are not in git.
+
+**Check Lab** (under Settings) opens when a lab name is entered. Green means approved. Red means not approved, and that tab stays red while the lab is open. Orange means the name is not on the list: reach out to the Team Lead, and that tab stays orange while the lab is open. The header beside Session matches the open lab. Create workspace shows that warning and an Acknowledge and continue button, then opens the lab. The approved list shows each lab's field (AI, ICS, or General) and difficulty.
+
+See `RELEASING.md` before putting a build on `main` for students.
+
 App source lives in `htb_app_lib/`. `README.md` stays in this directory.
 
 Optional hotkey: Parrot keyboard settings → custom shortcut →

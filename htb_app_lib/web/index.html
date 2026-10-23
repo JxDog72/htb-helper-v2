@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=25" />
+  <link rel="stylesheet" href="/app.css?v=30" />
   <script>
     try {
       var s = JSON.parse(localStorage.getItem("htb-settings") || "{}");
@@ -36,7 +36,12 @@
         <label>Assigned port (optional)<input name="target_port" inputmode="numeric" placeholder="leave blank if none" /></label>
         <label>Research project<input name="research_project" /></label>
         <p id="setup-error" class="error" hidden></p>
-        <button type="submit" class="btn copper">Create workspace</button>
+        <div id="setup-unapproved" class="setup-unapproved hidden">
+          <p id="setup-unapproved-headline" class="lab-verdict rejected"></p>
+          <p id="setup-unapproved-detail"></p>
+          <button type="button" class="btn copper" id="btn-ack-continue">Acknowledge and continue</button>
+        </div>
+        <button type="submit" class="btn copper" id="btn-create-workspace">Create workspace</button>
       </form>
       <button type="button" class="btn ghost hidden" id="btn-dismiss-setup">Stay on current lab</button>
     </div>
@@ -55,6 +60,7 @@
       <div><dt>Target</dt><dd id="meta-target">—</dd></div>
       <div><dt>Port</dt><dd id="meta-port">—</dd></div>
       <div><dt>Session</dt><dd id="meta-session">idle</dd></div>
+      <div><dt>Lab</dt><dd id="meta-approval">—</dd></div>
     </dl>
     <div class="top-actions">
       <div class="menu" id="session-menu">
@@ -90,6 +96,7 @@
       <button data-tab="help" class="rail-btn">Help</button>
       <button data-tab="lab" class="rail-btn">Lab-Config</button>
       <button data-tab="settings" class="rail-btn">Settings</button>
+      <button data-tab="checklab" class="rail-btn rail-check">Check Lab</button>
     </nav>
 
     <main>
@@ -274,6 +281,8 @@
         <div class="status-grid">
           <div>
             <h2>Environment</h2>
+            <p id="release-line" class="lede">Checking version…</p>
+            <p id="release-detail" class="quiet"></p>
             <ul id="preflight-list" class="ticks"></ul>
             <button type="button" class="btn ghost" id="btn-bootstrap">Install missing helper packages</button>
           </div>
@@ -361,6 +370,11 @@
           <p>Refresh the browser. If the page does not load, the helper is stopped. The port can be 8765–8784. If the address bar shows a different port, stop that one:</p>
           <pre class="syntax">fuser -k 8765/tcp</pre>
           <p><kbd>Ctrl</kbd>+<kbd>C</kbd> during a scan (ping, nmap, tracert) should stop <em>that command</em>, not the helper. On Windows, <kbd>Ctrl</kbd>+<kbd>C</kbd> twice quickly exits the logged shell if it is stuck. If the GUI dies too, just start <code>./htb</code> / <code>.\htb.cmd</code> again.</p>
+
+          <h3>Version and lab list</h3>
+          <p>Students stay on <code>main</code>. When a newer release exists, the terminal and Status tell you, and give a <code>git pull --ff-only</code> command. <code>./htb --no-update-check</code> skips that lookup.</p>
+          <p>A <code>dev</code> checkout says <code>Dev build</code> and the latest student release. It does not ask you to update over your test copy.</p>
+          <p><strong>Check Lab</strong> (under Settings) is green when the open lab is approved. If the lab is not approved, that tab stays red and shows a warning. If the name is not on the list, the warning is orange and says to reach out to the Team Lead. That tab stays orange while the lab is open. The header beside Session matches the open lab. Creating that lab asks you to acknowledge the warning, then opens the workspace. The approved list shows each lab's field (AI, ICS, or General) and difficulty.</p>
 
           <h3>First install (Parrot / Kali)</h3>
           <pre class="syntax">git clone https://github.com/JxDog72/htb-helper-v2.git
@@ -530,8 +544,23 @@ git pull
           </div>
         </div>
       </section>
+
+      <section id="tab-checklab" class="tab">
+        <h2>Check lab</h2>
+        <p class="lede">Green is approved. Red is not approved. Orange means the name is not on the list: reach out to the Team Lead. You can keep working.</p>
+        <p id="lab-check-headline" class="lab-verdict"></p>
+        <p id="lab-check-detail" class="lede"></p>
+        <label>Lab name
+          <input id="lab-check-name" placeholder="Llama" autocomplete="off" />
+        </label>
+        <button type="button" class="btn ghost" id="btn-lab-check">Check lab</button>
+        <label class="check"><input type="checkbox" id="block-unapproved" /> Refuse to create a new lab folder when the list says it is not approved</label>
+        <h3>Approved labs</h3>
+        <p class="quiet">Each name shows its field and difficulty. Click a name to check it. To start that lab, use Switch lab and enter the name.</p>
+        <div id="approved-lab-list"></div>
+      </section>
     </main>
   </div>
-  <script src="/app.js?v=40"></script>
+  <script src="/app.js?v=47"></script>
 </body>
 </html>
