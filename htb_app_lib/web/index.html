@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=28" />
+  <link rel="stylesheet" href="/app.css?v=29" />
   <script>
     try {
       var s = JSON.parse(localStorage.getItem("htb-settings") || "{}");
@@ -36,7 +36,12 @@
         <label>Assigned port (optional)<input name="target_port" inputmode="numeric" placeholder="leave blank if none" /></label>
         <label>Research project<input name="research_project" /></label>
         <p id="setup-error" class="error" hidden></p>
-        <button type="submit" class="btn copper">Create workspace</button>
+        <div id="setup-unapproved" class="setup-unapproved hidden">
+          <p id="setup-unapproved-headline" class="lab-verdict rejected"></p>
+          <p id="setup-unapproved-detail"></p>
+          <button type="button" class="btn copper" id="btn-ack-continue">Acknowledge and continue</button>
+        </div>
+        <button type="submit" class="btn copper" id="btn-create-workspace">Create workspace</button>
       </form>
       <button type="button" class="btn ghost hidden" id="btn-dismiss-setup">Stay on current lab</button>
     </div>
@@ -369,7 +374,7 @@
           <h3>Version and lab list</h3>
           <p>Students stay on <code>main</code>. When a newer release exists, the terminal and Status tell you, and give a <code>git pull --ff-only</code> command. <code>./htb --no-update-check</code> skips that lookup.</p>
           <p>A <code>dev</code> checkout says <code>Dev build</code> and the latest student release. It does not ask you to update over your test copy.</p>
-          <p><strong>Check Lab</strong> (under Settings) is green when the open lab is approved. If the lab is not approved, that tab stays red and shows a warning. The header beside Session says <strong>Approved</strong> or <strong>Not approved</strong> for the open lab. You can keep working. The approved list shows each lab's field (AI, ICS, or General) and difficulty.</p>
+          <p><strong>Check Lab</strong> (under Settings) is green when the open lab is approved. If the lab is not approved, that tab stays red and shows a warning. The header beside Session says <strong>Approved</strong> or <strong>Not approved</strong> for the open lab. Creating that lab asks you to acknowledge the warning, then opens the workspace. The approved list shows each lab's field (AI, ICS, or General) and difficulty.</p>
 
           <h3>First install (Parrot / Kali)</h3>
           <pre class="syntax">git clone https://github.com/JxDog72/htb-helper-v2.git
@@ -556,6 +561,6 @@ git pull
       </section>
     </main>
   </div>
-  <script src="/app.js?v=45"></script>
+  <script src="/app.js?v=46"></script>
 </body>
 </html>

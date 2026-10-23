@@ -1775,13 +1775,20 @@ class Handler(BaseHTTPRequestHandler):
                 config.pop("lab_folder", None)
                 destination = engine.workspace_from_config(config)
                 checked = release_info.check_lab(config["machine_name"])
+                acknowledge = bool(data.get("acknowledge_unapproved"))
                 if (
-                    not Path(destination).exists()
+                    not acknowledge
+                    and not Path(destination).exists()
                     and config.get("block_unapproved_labs")
                     and checked.get("reachable")
                     and checked.get("status") == "rejected"
                 ):
-                    self._json({"error": checked.get("message") or "That lab is not approved."}, 400)
+                    self._json({
+                        "error": checked.get("message") or "That lab is not approved.",
+                        "needs_ack": True,
+                        "headline": checked.get("headline") or "",
+                        "message": checked.get("message") or "",
+                    }, 400)
                     return
                 save_config(STATE["config_path"], config)
                 apply_config(config, STATE["config_path"])

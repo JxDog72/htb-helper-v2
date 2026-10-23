@@ -81,7 +81,7 @@ git checkout dev
 
 Do not delete either folder. `machines/`, notes, logs, and `config.json` are not in git.
 
-**Check Lab** (under Settings) opens when a lab name is entered. Green means approved. Red means not approved, and that tab stays red while the lab is open. The header beside Session says Approved or Not approved for that open lab. You can keep working. The approved list shows each lab's field (AI, ICS, or General) and difficulty.
+**Check Lab** (under Settings) opens when a lab name is entered. Green means approved. Red means not approved, and that tab stays red while the lab is open. The header beside Session says Approved or Not approved for that open lab. Create workspace shows that warning and an Acknowledge and continue button, then opens the lab. The approved list shows each lab's field (AI, ICS, or General) and difficulty.
 
 See `RELEASING.md` before putting a build on `main` for students.
 

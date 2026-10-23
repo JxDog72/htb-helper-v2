@@ -472,6 +472,21 @@ label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.82rem;
   width: min(32rem, 92vw); background: var(--panel); border: 1px solid var(--rule);
   padding: 1.4rem; display: flex; flex-direction: column; gap: 0.7rem;
 }
+.setup-unapproved {
+  border: 1px solid #ff5c5c;
+  padding: 0.85rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.setup-unapproved .lab-verdict { font-size: 1.25rem; }
+#setup-unapproved-detail {
+  margin: 0;
+  color: #ff5c5c;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
 .setup-card h1 { margin: 0; font-size: 1.5rem; color: var(--copper); }
 .setup-card h2 { margin: 1rem 0 0.4rem; font-size: 0.82rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--blue); }
 

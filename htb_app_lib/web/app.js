@@ -315,7 +315,13 @@
   async function api(path, opts) {
     const res = await fetch(path, opts);
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || res.statusText);
+    if (!res.ok) {
+      const err = new Error(data.error || res.statusText);
+      err.needsAck = !!data.needs_ack;
+      err.headline = data.headline || "";
+      err.detail = data.message || data.error || "";
+      throw err;
+    }
     return data;
   }
 
@@ -1254,28 +1260,90 @@
         $("btn-append").click();
       }
     });
+    function hideUnapprovedAck() {
+      const box = $("setup-unapproved");
+      if (box) box.classList.add("hidden");
+    }
+
+    function showUnapprovedAck(headline, message) {
+      const box = $("setup-unapproved");
+      if (!box) return;
+      $("setup-unapproved-headline").textContent = headline || "NOT APPROVED";
+      $("setup-unapproved-detail").textContent = message || "This lab is not approved. You can keep using HTB Helper.";
+      box.classList.remove("hidden");
+      $("setup-error").hidden = true;
+    }
+
+    function workspaceBody(fd, acknowledge) {
+      return {
+        student_id: fd.get("student_id"),
+        machine_name: fd.get("machine_name"),
+        target_ip: fd.get("target_ip"),
+        target_port: fd.get("target_port"),
+        research_project: fd.get("research_project"),
+        acknowledge_unapproved: !!acknowledge,
+      };
+    }
+
+    async function postWorkspace(fd, acknowledge) {
+      return api("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(workspaceBody(fd, acknowledge)),
+      });
+    }
+
+    const machineInput = $("setup-form").elements.machine_name;
+    if (machineInput) {
+      machineInput.addEventListener("input", () => hideUnapprovedAck());
+    }
+
     $("setup-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       $("setup-error").hidden = true;
+      hideUnapprovedAck();
       const fd = new FormData($("setup-form"));
+      const name = String(fd.get("machine_name") || "").trim();
+      const createBtn = $("btn-create-workspace");
+      if (createBtn) createBtn.disabled = true;
       try {
-        const created = await api("/api/config", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            student_id: fd.get("student_id"),
-            machine_name: fd.get("machine_name"),
-            target_ip: fd.get("target_ip"),
-            target_port: fd.get("target_port"),
-            research_project: fd.get("research_project"),
-          }),
-        });
-        await chooseLabDone(fd.get("machine_name"));
+        const checked = await api("/api/lab-check?name=" + encodeURIComponent(name));
+        if (checked && checked.tone === "rejected") {
+          showUnapprovedAck(checked.headline, checked.message);
+          return;
+        }
+        await postWorkspace(fd, false);
+        await chooseLabDone(name);
       } catch (err) {
+        if (err.needsAck) {
+          showUnapprovedAck(err.headline, err.detail || err.message);
+          return;
+        }
         $("setup-error").hidden = false;
         $("setup-error").textContent = err.message;
+      } finally {
+        if (createBtn) createBtn.disabled = false;
       }
     });
+
+    if ($("btn-ack-continue")) {
+      $("btn-ack-continue").addEventListener("click", async () => {
+        $("setup-error").hidden = true;
+        const fd = new FormData($("setup-form"));
+        const name = String(fd.get("machine_name") || "").trim();
+        const ackBtn = $("btn-ack-continue");
+        ackBtn.disabled = true;
+        try {
+          await postWorkspace(fd, true);
+          await chooseLabDone(name);
+        } catch (err) {
+          $("setup-error").hidden = false;
+          $("setup-error").textContent = err.message;
+        } finally {
+          ackBtn.disabled = false;
+        }
+      });
+    }
     $("lab-select").addEventListener("change", () => {
       state.labPick = $("lab-select").value;
     });
