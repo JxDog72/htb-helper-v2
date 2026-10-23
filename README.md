@@ -68,7 +68,7 @@ Do **not** use `sudo ./htb`. If you see `Permission denied`, run `chmod +x htb` 
 
 ## Students and the dev copy
 
-Students clone once and stay on `main`. `git pull` in that folder is still how a student gets the next release. The terminal and the Status tab say when a newer release exists, and they print the exact `git pull --ff-only` command. `./htb --no-update-check` skips that lookup.
+Students clone once and stay on `main`. The update steps are in [STUDENT_UPDATE.md](STUDENT_UPDATE.md). The terminal and the Status tab say when a newer release exists, and they print the exact `git pull --ff-only` command. `./htb --no-update-check` skips that lookup.
 
 The test copy is a second folder on the `dev` branch. Its terminal says `Dev build v2.1.0 (dev @ abc1234)` and `Latest student release: vX.Y.Z`. It does not tell you to pull `main` over the test copy. Day to day, `git pull` inside the dev folder stays on `dev`.
 
