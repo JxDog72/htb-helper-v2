@@ -95,18 +95,18 @@ Copy the full message and send it to the Team Lead. Leave the folder as it is.
 
 ## Ask for a lab to be checked
 
-You can open a pull request when you want a lab name checked. The request is the lab name only.
+The request is the lab name only. Do not include a link, a hint, a flag, or a password.
 
-Do not include a link, a hint, a flag, or a password. Do not merge the request. The Team Lead checks the lab and updates the list.
+**Option A.** Message the Team Lead with the lab name.
 
-1. Open [labs/CHECK_REQUESTS.md](https://github.com/JxDog72/htb-helper-v2/blob/main/labs/CHECK_REQUESTS.md).
+**Option B.** Open a pull request on GitHub: https://github.com/JxDog72/htb-helper-v2/blob/main/labs/CHECK_REQUESTS.md
+
+1. Open that link.
 2. Click the pencil icon. That lets you edit the page.
 3. GitHub will ask you to fork the repository. Accept that. A fork is your own copy where the edit can live.
 4. Add one new line: `Your Lab Name — please check this lab.`
 5. Click **Propose changes**, then **Create pull request**. That sends the lab name to the Team Lead.
-6. Stop there. Do not click merge.
-
-Sending the Team Lead the lab name is enough if you do not want to open a pull request.
+6. Stop there. Do not click merge. The Team Lead checks the lab and updates the list.
 
 ## Troubleshooting: black screen
 
@@ -114,4 +114,4 @@ This is uncommon. It can happen if the terminal was closed while the page was st
 
 Close that browser tab. Start the helper again with `./htb` (or `htb.cmd` on Windows) and open the page from the new terminal.
 
-If the page is still black, hard-refresh that tab with Ctrl+Shift+R. That reloads the page without the saved copy. Clearing the browser cache for `127.0.0.1` does the same thing and is the larger step.
+If the page is still black, hard-refresh that tab with Ctrl+Shift+R. That reloads the page without the saved copy. Clearing the browser cache for `127.0.0.1` does the same thing.
