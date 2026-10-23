@@ -145,7 +145,7 @@ In the GUI, **Lab-Config** (bottom of the left rail) changes this lab's student 
 
 ## 7. Version and lab check
 
-Students stay in the folder they cloned and stay on `main`. When the terminal says a new release is out, follow [STUDENT_UPDATE.md](STUDENT_UPDATE.md). The short version is `git pull --ff-only` in that folder.
+Students stay in the folder they cloned and stay on `main`. When the terminal says a new release is out, follow [htb-update10-22.md](htb-update10-22.md). The short version is `git pull --ff-only` in that folder.
 
 A second folder checked out on `dev` is the test copy. It prints `Dev build` and the latest student release. `git pull` in that folder does not switch it to the student release.
 
