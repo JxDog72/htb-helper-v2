@@ -2,7 +2,7 @@
 
 Use the folder you already cloned. Stay on `main`. This update does not delete lab folders, notes, logs, or `config.json`.
 
-Being several commits behind is normal. One pull brings all of them.
+Some folders are several commits behind. Some are already up to date and still need this version started again. One pull covers both.
 
 ## 1. Close it if it is open
 
@@ -57,13 +57,13 @@ git remote -v
 
 `git remote -v` prints the address this folder updates from. It should show `https://github.com/JxDog72/htb-helper-v2.git`.
 
-See how many updates you are behind:
+See whether an update is waiting:
 
 ```bash
 git status
 ```
 
-`git status` may say the branch is behind by several commits and can be fast-forwarded. That is the message you want.
+`git status` may say the branch is behind by several commits and can be fast-forwarded. It may not. This is the first full release, so a folder can show no commits behind and still need the new version. Either message is fine. Run the pull next.
 
 Download them:
 
@@ -117,3 +117,11 @@ Do not include a link, a hint, a flag, or a password. Do not merge the request. 
 6. Stop there. Do not click merge.
 
 Sending the Team Lead the lab name is enough if you do not want to open a pull request.
+
+## Troubleshooting: black screen
+
+This is uncommon. It can happen if the terminal was closed while the page was still open, and the browser kept a bad copy of that page. The lab folder is still there.
+
+Close that browser tab. Start the helper again with `./htb` (or `htb.cmd` on Windows) and open the page from the new terminal.
+
+If the page is still black, hard-refresh that tab with Ctrl+Shift+R. That reloads the page without the saved copy. Clearing the browser cache for `127.0.0.1` does the same thing and is the larger step.
