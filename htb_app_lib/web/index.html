@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HTB Helper</title>
-  <link rel="stylesheet" href="/app.css?v=26" />
+  <link rel="stylesheet" href="/app.css?v=28" />
   <script>
     try {
       var s = JSON.parse(localStorage.getItem("htb-settings") || "{}");
@@ -55,6 +55,7 @@
       <div><dt>Target</dt><dd id="meta-target">—</dd></div>
       <div><dt>Port</dt><dd id="meta-port">—</dd></div>
       <div><dt>Session</dt><dd id="meta-session">idle</dd></div>
+      <div><dt>Lab</dt><dd id="meta-approval">—</dd></div>
     </dl>
     <div class="top-actions">
       <div class="menu" id="session-menu">
@@ -368,7 +369,7 @@
           <h3>Version and lab list</h3>
           <p>Students stay on <code>main</code>. When a newer release exists, the terminal and Status tell you, and give a <code>git pull --ff-only</code> command. <code>./htb --no-update-check</code> skips that lookup.</p>
           <p>A <code>dev</code> checkout says <code>Dev build</code> and the latest student release. It does not ask you to update over your test copy.</p>
-          <p><strong>Check Lab</strong> (green, under Settings) reads the approved list. Green means approved. Red means not approved. Orange means check with the Team lead. If the list cannot be downloaded, you can still go on. The helper does not delete the folder.</p>
+          <p><strong>Check Lab</strong> (under Settings) is green when the open lab is approved. If the lab is not approved, that tab stays red and shows a warning. The header beside Session says <strong>Approved</strong> or <strong>Not approved</strong> for the open lab. You can keep working. The approved list shows each lab's field (AI, ICS, or General) and difficulty.</p>
 
           <h3>First install (Parrot / Kali)</h3>
           <pre class="syntax">git clone https://github.com/JxDog72/htb-helper-v2.git
@@ -541,8 +542,8 @@ git pull
 
       <section id="tab-checklab" class="tab">
         <h2>Check lab</h2>
-        <p class="lede">Green is approved. Red is not approved. Orange means check with the Team lead. Your lab folder is not deleted.</p>
-        <p id="lab-check-headline" class="lab-verdict unsure">CHECK WITH THE TEAM LEAD</p>
+        <p class="lede">Green is approved. Red is not approved. You can keep working either way.</p>
+        <p id="lab-check-headline" class="lab-verdict"></p>
         <p id="lab-check-detail" class="lede"></p>
         <label>Lab name
           <input id="lab-check-name" placeholder="Llama" autocomplete="off" />
@@ -550,11 +551,11 @@ git pull
         <button type="button" class="btn ghost" id="btn-lab-check">Check lab</button>
         <label class="check"><input type="checkbox" id="block-unapproved" /> Refuse to create a new lab folder when the list says it is not approved</label>
         <h3>Approved labs</h3>
-        <p class="quiet">Click a name to check it. To start that lab, use Switch lab and enter the name.</p>
-        <div id="approved-lab-list" class="approved-lab-list"></div>
+        <p class="quiet">Each name shows its field and difficulty. Click a name to check it. To start that lab, use Switch lab and enter the name.</p>
+        <div id="approved-lab-list"></div>
       </section>
     </main>
   </div>
-  <script src="/app.js?v=43"></script>
+  <script src="/app.js?v=45"></script>
 </body>
 </html>

@@ -348,13 +348,13 @@ def check_lab(name):
         "Couldn't reach the approved lab list. Check with the Team lead. "
         "You can still go on."
     )
-    unknown = "Not sure this lab is approved. Check with the Team lead before you start."
+    unknown = "This lab is not approved. You can keep using HTB Helper."
     result = {
         "ok": False,
         "query": query,
         "status": "",
-        "tone": "unsure",
-        "headline": "CHECK WITH THE TEAM LEAD",
+        "tone": "",
+        "headline": "",
         "reachable": False,
         "message": unreachable if query else unknown,
         "last_checked": "",
@@ -367,7 +367,7 @@ def check_lab(name):
     data, source = load_lab_list()
     if not data:
         result["message"] = unreachable
-        result["headline"] = f"{query} — CHECK WITH THE TEAM LEAD"
+        result["headline"] = "COULD NOT CHECK"
         return result
     result["reachable"] = True
     result["source"] = source
@@ -387,8 +387,8 @@ def check_lab(name):
     if match is None:
         result["ok"] = True
         result["status"] = "unknown"
-        result["tone"] = "unsure"
-        result["headline"] = f"{query} — CHECK WITH THE TEAM LEAD"
+        result["tone"] = "rejected"
+        result["headline"] = f"{query} — NOT APPROVED"
         result["message"] = unknown
         return result
     status = str(match.get("status") or "").strip().lower()
@@ -399,11 +399,11 @@ def check_lab(name):
     elif status == "rejected":
         if posted:
             message = (
-                "Not approved. A public writeup or specific hints exist "
-                f"(posted {posted}). Pick another lab."
+                "This lab is not approved. A public writeup or specific hints exist "
+                f"(posted {posted}). You can keep using HTB Helper."
             )
         else:
-            message = "Not approved. A public writeup or specific hints exist. Pick another lab."
+            message = "This lab is not approved. You can keep using HTB Helper."
         result["block"] = True
     else:
         result["status"] = "pending"
@@ -417,7 +417,7 @@ def check_lab(name):
     elif status == "rejected":
         tone, headline = "rejected", f"{label} — NOT APPROVED"
     else:
-        tone, headline = "unsure", f"{label} — CHECK WITH THE TEAM LEAD"
+        tone, headline = "rejected", f"{label} — NOT APPROVED"
     result["ok"] = True
     result["status"] = status
     result["tone"] = tone
@@ -437,6 +437,8 @@ def lab_names():
             names.append({
                 "name": str(lab.get("name")),
                 "status": str(lab.get("status") or ""),
+                "field": str(lab.get("field") or ""),
+                "difficulty": str(lab.get("difficulty") or ""),
             })
     return {
         "ok": True,

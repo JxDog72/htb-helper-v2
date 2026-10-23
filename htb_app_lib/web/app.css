@@ -254,6 +254,8 @@ button { cursor: pointer; }
 .meta { display: flex; gap: 1.4rem; margin: 0; }
 .meta dt { font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--quiet); }
 .meta dd { margin: 0.1rem 0 0; font-family: var(--font-mono); font-size: 0.85rem; color: var(--copper-hot); }
+#meta-approval.approved { color: #3ddc84; font-weight: 700; }
+#meta-approval.rejected { color: #ff5c5c; font-weight: 700; }
 .top-actions { display: flex; align-items: center; gap: 0.7rem; }
 .quiet { color: var(--quiet); font-size: 0.8rem; }
 .lede { color: var(--quiet); max-width: 48rem; line-height: 1.45; }
@@ -286,6 +288,12 @@ button { cursor: pointer; }
   font-weight: 700;
 }
 .rail-btn.rail-check.active { border-left-color: #3ddc84; background: var(--rail-active-bg); }
+.rail-btn.rail-check.unapproved,
+.rail-btn.rail-check.unapproved:hover,
+.rail-btn.rail-check.unapproved.active {
+  color: #ff5c5c;
+  border-left-color: #ff5c5c;
+}
 .lab-verdict {
   font-size: 1.7rem;
   font-weight: 700;
@@ -294,16 +302,37 @@ button { cursor: pointer; }
 }
 .lab-verdict.approved { color: #3ddc84; }
 .lab-verdict.rejected { color: #ff5c5c; }
-.lab-verdict.unsure { color: #f0a030; }
+#lab-check-detail.warning {
+  color: #ff5c5c;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.lab-field { margin: 0.85rem 0 0.15rem; }
+.lab-field h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--quiet);
+}
 .approved-lab-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .approved-lab-list button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
   border: 1px solid var(--rule);
   background: transparent;
   color: var(--text);
-  padding: 0.35rem 0.6rem;
+  padding: 0.4rem 0.65rem;
   cursor: pointer;
+  text-align: left;
 }
+.lab-chip-name { font-weight: 700; }
+.lab-chip-meta { font-size: 0.72rem; letter-spacing: 0.03em; color: var(--quiet); }
 .approved-lab-list button:hover { border-color: #3ddc84; color: #3ddc84; }
+.approved-lab-list button:hover .lab-chip-meta { color: #3ddc84; }
 
 main { overflow: hidden; min-width: 0; }
 .tab { display: none; height: 100%; padding: 0.8rem 1rem; overflow: auto; }

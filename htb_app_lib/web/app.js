@@ -59,6 +59,7 @@
     applyingPreview: false,
     lastOutFile: "",
     osName: "",
+    openLabKey: "",
   };
 
   const THEME_SWATCH = {
@@ -428,6 +429,7 @@
     $("meta-machine").textContent = (data.config && data.config.machine_name) || "—";
     $("meta-target").textContent = (data.config && data.config.target_ip) || "—";
     $("meta-port").textContent = (data.config && data.config.target_port) || "—";
+    syncOpenLabMark((data.config && data.config.machine_name) || "");
 
     let sessionLabel = "idle";
     if (data.session_active && data.session_paused) sessionLabel = "PAUSED";
@@ -460,35 +462,100 @@
     setTab(TABS.includes(start) ? start : "help");
   }
 
-  function paintLabCheck(data) {
-    const head = $("lab-check-headline");
-    const detail = $("lab-check-detail");
-    if (!head || !detail) return;
-    const tone = (data && data.tone) || "unsure";
-    head.className = "lab-verdict " + tone;
-    head.textContent = (data && data.headline) || "CHECK WITH THE TEAM LEAD";
-    detail.textContent = (data && data.message) || "";
+  function labKey(name) {
+    return String(name || "")
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/[_-]/g, " ")
+      .replace(/[^a-z0-9]+/gi, "")
+      .toLowerCase();
   }
 
-  async function runLabCheck(name) {
+  function paintOpenLabMark(tone) {
+    const rail = document.querySelector(".rail-btn.rail-check");
+    const mark = $("meta-approval");
+    if (rail) rail.classList.toggle("unapproved", tone === "rejected");
+    if (!mark) return;
+    mark.classList.remove("approved", "rejected");
+    if (tone === "approved") {
+      mark.textContent = "Approved";
+      mark.classList.add("approved");
+    } else if (tone === "rejected") {
+      mark.textContent = "Not approved";
+      mark.classList.add("rejected");
+    } else {
+      mark.textContent = "—";
+    }
+  }
+
+  function paintLabCheck(data, forOpen) {
+    const head = $("lab-check-headline");
+    const detail = $("lab-check-detail");
+    const tone = (data && data.tone) || "";
+    if (head && detail) {
+      head.className = "lab-verdict" + (tone ? " " + tone : "");
+      head.textContent = (data && data.headline) || "";
+      detail.textContent = (data && data.message) || "";
+      detail.classList.toggle("warning", tone === "rejected");
+    }
+    if (forOpen) paintOpenLabMark(tone);
+  }
+
+  function openLabMatches(query) {
+    const openName = ($("meta-machine") && $("meta-machine").textContent) || "";
+    const key = labKey(query);
+    return !!key && key !== "machinename" && key === labKey(openName);
+  }
+
+  async function syncOpenLabMark(machineName) {
+    const key = labKey(machineName);
+    if (!key || key === "machinename") {
+      if (state.openLabKey) {
+        state.openLabKey = "";
+        paintOpenLabMark("");
+      }
+      return;
+    }
+    if (key === state.openLabKey) return;
+    state.openLabKey = key;
+    try {
+      const data = await api("/api/lab-check?name=" + encodeURIComponent(machineName));
+      if (labKey($("meta-machine").textContent) !== key) return;
+      paintOpenLabMark((data && data.tone) || "");
+    } catch (err) {
+      if (labKey($("meta-machine").textContent) === key) paintOpenLabMark("");
+    }
+  }
+
+  async function runLabCheck(name, forOpen) {
     const query = (name || "").trim();
     if ($("lab-check-name") && query) $("lab-check-name").value = query;
-    paintLabCheck({ tone: "unsure", headline: "Checking…", message: "" });
+    const head = $("lab-check-headline");
+    const detail = $("lab-check-detail");
+    if (head) {
+      head.className = "lab-verdict";
+      head.textContent = query ? "Checking…" : "";
+    }
+    if (detail) {
+      detail.textContent = "";
+      detail.classList.remove("warning");
+    }
+    const sticks = !!forOpen || openLabMatches(query);
     try {
       const data = await api("/api/lab-check?name=" + encodeURIComponent(query));
-      paintLabCheck(data);
+      paintLabCheck(data, sticks && openLabMatches(query || name));
+      if (sticks && openLabMatches(query || name)) state.openLabKey = labKey(query);
     } catch (err) {
       paintLabCheck({
-        tone: "unsure",
-        headline: "CHECK WITH THE TEAM LEAD",
-        message: err.message,
-      });
+        tone: "",
+        headline: "COULD NOT CHECK",
+        message: err.message || "Couldn't reach the approved lab list. Check with the Team lead. You can still go on.",
+      }, !!(forOpen && openLabMatches(query)));
     }
   }
 
   async function showLabCheck(name) {
     setTab("checklab");
-    await runLabCheck(name);
+    await runLabCheck(name, true);
   }
 
   async function loadApprovedLabs() {
@@ -501,9 +568,33 @@
     }
     if ($("block-unapproved")) $("block-unapproved").checked = !!catalog.block_unapproved_labs;
     const approved = (catalog.names || []).filter((lab) => lab.status === "approved");
-    box.innerHTML = approved.map((lab) => (
-      `<button type="button" data-lab="${escapeHtml(lab.name)}">${escapeHtml(lab.name)}</button>`
-    )).join("");
+    const fieldOrder = ["ICS", "AI", "General"];
+    const diffOrder = ["V-Easy", "Easy", "Medium", "Hard", "Insane"];
+    const groups = new Map();
+    approved.forEach((lab) => {
+      const field = lab.field || "General";
+      if (!groups.has(field)) groups.set(field, []);
+      groups.get(field).push(lab);
+    });
+    const fields = [...groups.keys()].sort((a, b) => {
+      const ia = fieldOrder.indexOf(a);
+      const ib = fieldOrder.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    box.innerHTML = fields.map((field) => {
+      const labs = groups.get(field).slice().sort((a, b) => {
+        const da = diffOrder.indexOf(a.difficulty);
+        const db = diffOrder.indexOf(b.difficulty);
+        const byDiff = (da < 0 ? 99 : da) - (db < 0 ? 99 : db);
+        if (byDiff) return byDiff;
+        return String(a.name).localeCompare(String(b.name));
+      });
+      const buttons = labs.map((lab) => {
+        const meta = [lab.field || field, lab.difficulty].filter(Boolean).join(" · ");
+        return `<button type="button" data-lab="${escapeHtml(lab.name)}"><span class="lab-chip-name">${escapeHtml(lab.name)}</span><span class="lab-chip-meta">${escapeHtml(meta)}</span></button>`;
+      }).join("");
+      return `<section class="lab-field"><h4>${escapeHtml(field)}</h4><div class="approved-lab-list">${buttons}</div></section>`;
+    }).join("");
   }
 
   function speedUpOn() {
@@ -1592,8 +1683,12 @@
     });
     if ($("btn-lab-check")) {
       $("btn-lab-check").addEventListener("click", () => {
-        runLabCheck($("lab-check-name").value).catch((err) => {
-          paintLabCheck({ tone: "unsure", headline: "CHECK WITH THE TEAM LEAD", message: err.message });
+        runLabCheck($("lab-check-name").value, false).catch((err) => {
+          paintLabCheck({
+            tone: "",
+            headline: "COULD NOT CHECK",
+            message: err.message,
+          }, false);
         });
       });
     }
